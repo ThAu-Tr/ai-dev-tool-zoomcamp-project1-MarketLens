@@ -97,11 +97,13 @@ Illustrative endpoint groups:
 ```text
 GET    /api/dashboard
 GET    /api/assets
+GET    /api/assets/search?q=...
 POST   /api/assets
 PATCH  /api/assets/{asset_id}
-POST   /api/assets/{asset_id}/lots
+DELETE /api/assets/{asset_id}
+PUT    /api/assets/{asset_id}/lots
 GET    /api/industries
-POST   /api/industries/follows
+PUT    /api/industries/{industry_id}/follow
 POST   /api/refresh
 GET    /api/timeline?date=YYYY-MM-DD
 ```

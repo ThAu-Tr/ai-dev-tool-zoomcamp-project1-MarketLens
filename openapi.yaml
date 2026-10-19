@@ -1,0 +1,418 @@
+openapi: 3.1.0
+info:
+  title: MarketLens API
+  version: 0.1.0
+  description: |
+    HTTP/JSON contract for the MarketLens MVP frontend.
+
+    Authentication is intentionally omitted for the MVP. Every operation in this
+    document has `security: []` and acts on the seeded single demo user. A future
+    multi-user version will add authentication without changing the resource model.
+servers:
+  - url: http://localhost:8000
+    description: Local FastAPI development server
+security: []
+paths:
+  /api/dashboard:
+    get:
+      summary: Read the stored dashboard
+      description: Returns stored watchlist data only; it does not trigger a provider refresh.
+      security: []
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /api/refresh:
+    post:
+      summary: Refresh newer market and news data
+      description: |
+        Runs the MVP's synchronous incremental refresh. The backend preserves
+        previously stored data if an external provider fails.
+      security: []
+      responses:
+        '200':
+          description: Refresh completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lastRefreshedAt]
+                properties:
+                  lastRefreshedAt:
+                    type: string
+                    format: date-time
+                    example: '2026-10-19T17:42:00Z'
+        '502':
+          $ref: '#/components/responses/ProviderError'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /api/assets:
+    get:
+      summary: List followed assets
+      security: []
+      responses:
+        '200':
+          description: Followed assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Asset'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+    post:
+      summary: Add an asset to the watchlist
+      description: Indices must use the Interested status and must not include purchase lots.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetCreate'
+      responses:
+        '201':
+          description: Asset added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /api/assets/search:
+    get:
+      summary: Search the supported asset catalogue
+      description: Returns valid Stocks, ETFs, and Indices selectable for a watchlist entry.
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Case-insensitive name or ticker prefix/substring.
+          schema:
+            type: string
+            minLength: 1
+          example: asml
+      responses:
+        '200':
+          description: Matching selectable assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetSearchResult'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/ProviderError'
+  /api/assets/{assetId}:
+    parameters:
+      - $ref: '#/components/parameters/AssetId'
+    patch:
+      summary: Update an asset's follow or ownership state
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetUpdate'
+      responses:
+        '200':
+          description: Updated asset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      summary: Remove an asset from the watchlist
+      description: |
+        Removes the asset and its active purchase lots from the demo user's
+        watchlist. Previously stored timeline data is retained in the archive.
+      security: []
+      responses:
+        '204':
+          description: Asset removed; no response body
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /api/assets/{assetId}/lots:
+    parameters:
+      - $ref: '#/components/parameters/AssetId'
+    put:
+      summary: Replace an owned asset's active purchase lots
+      description: |
+        The frontend sends the complete active-lot list. The backend validates
+        positive decimal values and returns the resulting asset, including lots.
+        Indices cannot have lots.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lots]
+              properties:
+                lots:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/LotInput'
+      responses:
+        '200':
+          description: Asset with the persisted active lots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/industries:
+    get:
+      summary: List available and followed industries
+      security: []
+      responses:
+        '200':
+          description: Industries with followed state and asset-based suggestions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Industry'
+        '500':
+          $ref: '#/components/responses/UnexpectedError'
+  /api/industries/{industryId}/follow:
+    parameters:
+      - $ref: '#/components/parameters/IndustryId'
+    put:
+      summary: Follow or unfollow an industry
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [followed]
+              properties:
+                followed:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated industry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Industry'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/timeline:
+    get:
+      summary: Read or lazily load one historical day
+      description: |
+        For an archived day, returns stored data. For a previously unrequested
+        eligible day, fetches, classifies, persists, and returns the available data.
+      security: []
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: Requested market calendar date. Initial requests are limited to the preceding 30 days.
+          schema:
+            type: string
+            format: date
+          example: '2026-10-16'
+      responses:
+        '200':
+          description: Archived or newly loaded timeline day
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimelineDay'
+        '400':
+          description: Date is outside the allowed initial history window and has not been archived.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          $ref: '#/components/responses/ProviderError'
+components:
+  parameters:
+    AssetId:
+      name: assetId
+      in: path
+      required: true
+      schema: { type: string }
+      example: sap
+    IndustryId:
+      name: industryId
+      in: path
+      required: true
+      schema: { type: string }
+      example: semi
+  responses:
+    ValidationError:
+      description: Input does not satisfy the endpoint's domain rules.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Requested resource does not exist for the demo user.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ProviderError:
+      description: An external provider could not complete the requested operation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    UnexpectedError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    AssetType:
+      type: string
+      enum: [Stock, ETF, Index]
+    FollowStatus:
+      type: string
+      enum: [Owned, Interested]
+    Relevance:
+      type: string
+      enum: [Direct asset news, Industry news, Market context]
+    Lot:
+      type: object
+      required: [id, quantity, purchasePrice]
+      properties:
+        id: { type: string, example: sap-1 }
+        quantity: { type: string, pattern: '^[0-9]+(\.[0-9]+)?$', example: '5' }
+        purchasePrice: { type: string, pattern: '^[0-9]+(\.[0-9]+)?$', example: '130.00' }
+    LotInput:
+      type: object
+      required: [id, quantity, purchasePrice]
+      properties:
+        id:
+          type: string
+          description: Client-created ID for a newly added lot, or existing lot ID.
+          example: sap-1
+        quantity: { type: string, pattern: '^[0-9]+(\.[0-9]+)?$', example: '5' }
+        purchasePrice: { type: string, pattern: '^[0-9]+(\.[0-9]+)?$', example: '130.00' }
+    Asset:
+      type: object
+      required: [id, name, ticker, exchange, type, status, price, currency, changePercent, asOf, lots, industries]
+      properties:
+        id: { type: string, example: sap }
+        name: { type: string, example: SAP SE }
+        ticker: { type: string, example: SAP }
+        exchange: { type: string, example: XETRA }
+        type: { $ref: '#/components/schemas/AssetType' }
+        status: { $ref: '#/components/schemas/FollowStatus' }
+        price: { type: number, example: 210.35 }
+        currency: { type: string, example: EUR }
+        changePercent: { type: number, example: -2.3 }
+        asOf: { type: string, example: '2026-10-19T16:40:00Z' }
+        lots:
+          type: array
+          items: { $ref: '#/components/schemas/Lot' }
+        industries:
+          type: array
+          items: { type: string }
+    AssetCreate:
+      type: object
+      required: [name, ticker, exchange, type, status, lots, industries]
+      properties:
+        name: { type: string, example: SAP SE }
+        ticker: { type: string, example: SAP }
+        exchange: { type: string, example: XETRA }
+        type: { $ref: '#/components/schemas/AssetType' }
+        status: { $ref: '#/components/schemas/FollowStatus' }
+        lots:
+          type: array
+          items: { $ref: '#/components/schemas/LotInput' }
+        industries:
+          type: array
+          items: { type: string }
+    AssetSearchResult:
+      type: object
+      required: [name, ticker, exchange, type]
+      properties:
+        name: { type: string, example: ASML Holding }
+        ticker: { type: string, example: ASML }
+        exchange: { type: string, example: Euronext Amsterdam }
+        type: { $ref: '#/components/schemas/AssetType' }
+    AssetUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        status: { $ref: '#/components/schemas/FollowStatus' }
+    Article:
+      type: object
+      required: [id, headline, source, publishedAt, relevance, assets, industries, snippet, url]
+      properties:
+        id: { type: string, example: a1 }
+        headline: { type: string, example: European enterprise software outlook turns more cautious }
+        source: { type: string, example: Financial Review }
+        publishedAt: { type: string, example: '2026-10-19T14:12:00Z' }
+        relevance: { $ref: '#/components/schemas/Relevance' }
+        assets: { type: array, items: { type: string }, example: [SAP] }
+        industries: { type: array, items: { type: string }, example: [Enterprise software] }
+        snippet: { type: string, example: Analysts highlighted softer spending signals across large European software buyers. }
+        url: { type: string, format: uri, example: 'https://publisher.example/article' }
+    ContextSummary:
+      type: object
+      required: [id, assetId, summary, articleIds]
+      properties:
+        id: { type: string, example: c1 }
+        assetId: { type: string, example: sap }
+        summary: { type: string, example: Possible context includes softer enterprise-software sentiment. }
+        articleIds: { type: array, items: { type: string }, example: [a1] }
+    Dashboard:
+      type: object
+      required: [assets, articles, summaries, lastRefreshedAt]
+      properties:
+        assets: { type: array, items: { $ref: '#/components/schemas/Asset' } }
+        articles: { type: array, items: { $ref: '#/components/schemas/Article' } }
+        summaries: { type: array, items: { $ref: '#/components/schemas/ContextSummary' } }
+        lastRefreshedAt: { type: string, example: '2026-10-19T17:42:00Z' }
+    Industry:
+      type: object
+      required: [id, name, followed, suggestedBy]
+      properties:
+        id: { type: string, example: semi }
+        name: { type: string, example: Semiconductors }
+        followed: { type: boolean, example: true }
+        suggestedBy: { type: array, items: { type: string }, example: [SMH] }
+    TimelineDay:
+      type: object
+      required: [date, source, assets, articles, summaries]
+      properties:
+        date: { type: string, format: date, example: '2026-10-16' }
+        source: { type: string, enum: [archive, newly-loaded] }
+        marketClosed: { type: boolean, default: false }
+        assets: { type: array, items: { $ref: '#/components/schemas/Asset' } }
+        articles: { type: array, items: { $ref: '#/components/schemas/Article' } }
+        summaries: { type: array, items: { $ref: '#/components/schemas/ContextSummary' } }
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string, example: The requested asset was not found. }

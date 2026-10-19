@@ -71,6 +71,8 @@ Assets the user wants to monitor but does not currently own.
 
 Owned and Interested are properties of the asset itself and belong in the same asset list.
 
+Users can remove an asset from their watchlist when they no longer want to monitor it. Removing an asset also removes its active purchase lots from the watchlist; it does not delete already collected historical timeline data.
+
 ---
 
 ## 6. Owned Positions
