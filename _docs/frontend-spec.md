@@ -221,7 +221,7 @@ The day view must make it clear that publication time and the relevant market tr
 
 ## 6. API-facing frontend contract
 
-The final OpenAPI document is the source of truth. Until it is generated, the frontend should be developed against mock service functions that mirror these endpoint groups:
+The checked-in [OpenAPI contract](../openapi.yaml) is the source of truth. Until it is generated, the frontend should be developed against mock service functions that mirror these endpoint groups:
 
 | Need | API group | Frontend behaviour |
 | --- | --- | --- |

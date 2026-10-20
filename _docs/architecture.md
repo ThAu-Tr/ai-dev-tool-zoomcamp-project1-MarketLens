@@ -90,7 +90,7 @@ Even without login in the MVP, user-created records should have a `user_id` fore
 
 ## Frontend-backend API
 
-The frontend communicates with FastAPI through versioned JSON endpoints under `/api`. FastAPI generates the OpenAPI contract from the route definitions. The contract is the agreement between frontend and backend and documents request shapes, responses, validation errors, and status codes.
+The frontend communicates with FastAPI through versioned JSON endpoints under `/api`. The checked-in [OpenAPI contract](../openapi.yaml) is the agreement between frontend and backend and documents request shapes, responses, validation errors, and status codes. FastAPI route definitions must remain aligned with that contract.
 
 Illustrative endpoint groups:
 

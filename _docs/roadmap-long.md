@@ -68,12 +68,11 @@ Database
 
 Use the Week 1 workflow as the development process for the whole project.
 
-- [ ] Create `AGENTS.md`.
-- [ ] Define the PM role.
-- [ ] Define the Software Engineer role.
-- [ ] Define the QA role.
-- [ ] Define the general development process.
-- [ ] Define how issues move through the workflow.
+- [X] Create `AGENTS.md`.
+- [X] Define the PM role.
+- [X] Define the Software Engineer role.
+- [X] Define the QA role.
+- [X] Define the general development process.
 
 Expected workflow:
 
@@ -111,14 +110,14 @@ _docs/team/qa.md
 
 Use the product specification to build the application UI before implementing the real backend.
 
-- [ ] Generate the basic frontend.
-- [ ] Implement the main user flows.
-- [ ] Use mocked data or mocked service calls.
-- [ ] Make sure all core MVP actions can be demonstrated.
-- [ ] Interact with the frontend yourself.
-- [ ] Identify awkward or unnecessary functionality.
-- [ ] Simplify the MVP if necessary.
-- [ ] Update `plan.md` if the prototype changes the product definition.
+- [X] Generate the basic frontend.
+- [X] Implement the main user flows.
+- [X] Use mocked data or mocked service calls.
+- [X] Make sure all core MVP actions can be demonstrated.
+- [X] Interact with the frontend yourself.
+- [X] Identify awkward or unnecessary functionality.
+- [X] Simplify the MVP if necessary.
+- [X] Update `plan.md` if the prototype changes the product definition.
 
 The frontend at this point is a **prototype**, not necessarily the final production frontend.
 
@@ -135,13 +134,13 @@ The frontend at this point is a **prototype**, not necessarily the final product
 
 Use the validated frontend to determine what the backend actually needs to provide.
 
-- [ ] Identify frontend operations requiring backend calls.
-- [ ] Define endpoints.
-- [ ] Define request formats.
-- [ ] Define response formats.
-- [ ] Define validation/error responses.
-- [ ] Create or generate the OpenAPI specification.
-- [ ] Check that every core frontend interaction has an API equivalent.
+- [X] Identify frontend operations requiring backend calls.
+- [X] Define endpoints.
+- [X] Define request formats.
+- [X] Define response formats.
+- [X] Define validation/error responses.
+- [X] Create or generate the OpenAPI specification.
+- [X] Check that every core frontend interaction has an API equivalent.
 
 ### Output
 - `openapi.yaml`, generated OpenAPI documentation or equivalent API contract
@@ -192,14 +191,14 @@ Each feature may span:
 UI → API → backend logic → persistence → tests
 ```
 
-- [ ] Generate proposed backlog items.
-- [ ] Review them manually.
-- [ ] Remove unnecessary tasks.
-- [ ] Split tasks that are too large.
-- [ ] Merge tasks that are unnecessarily small.
-- [ ] Check that every MVP feature is represented.
-- [ ] Add required technical tasks that are not feature-specific.
-- [ ] Move the final backlog to GitHub Issues.
+- [X] Generate proposed backlog items.
+- [X] Review them manually.
+- [X] Remove unnecessary tasks.
+- [X] Split tasks that are too large.
+- [X] Merge tasks that are unnecessarily small.
+- [X] Check that every MVP feature is represented.
+- [X] Add required technical tasks that are not feature-specific.
+- [X] Move the final backlog to GitHub Issues.
 
 ### Output
 - Final MVP backlog
@@ -530,11 +529,11 @@ Good moments to capture:
 
 ### After Phase 1
 
-- [ ] Update problem description.
-- [ ] Update MVP scope.
-- [ ] Update architecture.
-- [ ] Reference OpenAPI.
-- [ ] Add one useful AI workflow example.
+- [X] Update problem description.
+- [X] Update MVP scope.
+- [X] Update architecture.
+- [X] Reference OpenAPI.
+- [X] Add one useful AI workflow example.
 
 ### After Phase 2
 
