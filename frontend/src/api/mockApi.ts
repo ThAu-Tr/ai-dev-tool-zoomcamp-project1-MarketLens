@@ -38,10 +38,6 @@ const assetCatalogue: AssetSearchResult[] = [
 const cloneAssets = () => assets.map((asset) => ({ ...asset, lots: asset.lots.map((lot) => ({ ...lot })), industries: [...asset.industries] }))
 
 export const mockApi = {
-  async getDashboard(): Promise<Dashboard> {
-    await delay()
-    return { assets: cloneAssets(), articles: articles.map((article) => ({ ...article })), summaries: summaries.map((summary) => ({ ...summary, articleIds: [...summary.articleIds] })), lastRefreshedAt }
-  },
   async refresh(): Promise<void> {
     await delay(1100)
     lastRefreshedAt = 'Just now'

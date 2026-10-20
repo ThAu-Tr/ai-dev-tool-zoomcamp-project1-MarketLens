@@ -44,7 +44,7 @@ export type Dashboard = {
   assets: Asset[]
   articles: Article[]
   summaries: ContextSummary[]
-  lastRefreshedAt: string
+  lastRefreshedAt: string | null
 }
 
 export type Industry = { id: string; name: string; followed: boolean; suggestedBy: string[] }

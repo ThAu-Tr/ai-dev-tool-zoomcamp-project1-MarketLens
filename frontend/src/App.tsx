@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { dashboardApi } from './api/dashboardApi'
 import { mockApi } from './api/mockApi'
 import type { Asset, AssetSearchResult, Dashboard, Industry, Lot, Relevance, TimelineDay } from './types'
 
@@ -23,15 +24,20 @@ export default function App() {
   const load = async () => {
     setLoading(true)
     try {
-      const [nextDashboard, nextIndustries] = await Promise.all([mockApi.getDashboard(), mockApi.getIndustries()])
+      const nextDashboard = await dashboardApi.getDashboard()
       setDashboard(nextDashboard)
-      setIndustries(nextIndustries)
       setError('')
     } catch { setError('MarketLens could not load stored data. Please try again.') }
     finally { setLoading(false) }
   }
 
+  const loadIndustries = async () => {
+    const nextIndustries = await mockApi.getIndustries()
+    setIndustries(nextIndustries)
+  }
+
   useEffect(() => { void load() }, [])
+  useEffect(() => { if (view === 'watchlist') void loadIndustries() }, [view])
 
   const refresh = async () => {
     setRefreshing(true)
@@ -41,7 +47,7 @@ export default function App() {
   }
 
   const navigate = (next: View) => { setView(next); setError('') }
-  const onAssetSaved = async () => { setAddOpen(false); setSelectedAsset(null); await load() }
+  const onAssetSaved = async () => { setAddOpen(false); setSelectedAsset(null); await Promise.all([load(), loadIndustries()]) }
 
   return (
     <div className="app-shell">
@@ -56,7 +62,7 @@ export default function App() {
       </header>
 
       <main>
-        {error && <div className="error-banner" role="alert"><span>!</span>{error}<button onClick={() => setError('')}>Dismiss</button></div>}
+        {error && <div className="error-banner" role="alert"><span>!</span>{error}<button onClick={() => void load()}>Retry</button><button onClick={() => setError('')}>Dismiss</button></div>}
         {loading && !dashboard ? <LoadingScreen /> : dashboard && <>
           {view === 'dashboard' && <DashboardView dashboard={dashboard} refreshing={refreshing} onRefresh={refresh} onManage={(asset) => { setSelectedAsset(asset); navigate('watchlist') }} onAdd={() => { setAddOpen(true); navigate('watchlist') }} />}
           {view === 'watchlist' && <WatchlistView assets={dashboard.assets} industries={industries} initialAsset={selectedAsset} onSelect={(asset) => setSelectedAsset(asset)} onAdd={() => setAddOpen(true)} onChanged={onAssetSaved} />}
@@ -74,11 +80,12 @@ function LoadingScreen() { return <div className="loading-screen"><span classNam
 function DashboardView({ dashboard, refreshing, onRefresh, onManage, onAdd }: { dashboard: Dashboard; refreshing: boolean; onRefresh: () => void; onManage: (asset: Asset) => void; onAdd: () => void }) {
   const groups: { title: string; relevance: Relevance; description: string }[] = [
     { title: 'Direct asset news', relevance: 'Direct asset news', description: 'News that directly concerns your followed assets.' },
-    { title: 'Industry pulse', relevance: 'Industry news', description: 'Developments connected to your followed industries.' },
+    { title: 'Industry news', relevance: 'Industry news', description: 'Developments connected to your followed industries.' },
     { title: 'Broader market context', relevance: 'Market context', description: 'Events that may be relevant to the wider market.' },
   ]
+  if (!dashboard.assets.length) return <FirstUseDashboard onAdd={onAdd} />
   return <section className="page dashboard-page">
-    <div className="eyebrow">TODAY’S VIEW <span>•</span> {dashboard.lastRefreshedAt}</div>
+    <div className="eyebrow">TODAY’S VIEW <span>•</span> {dashboard.lastRefreshedAt ?? 'Not refreshed yet'}</div>
     <div className="page-heading dashboard-heading">
       <div><h1>Market movements,<br /><em>in context.</em></h1><p>Stored data appears immediately. Refresh retrieves only newer available data.</p></div>
       <button className="button primary" disabled={refreshing} onClick={onRefresh}>{refreshing ? <><span className="loader small" /> Refreshing…</> : <>↻ Refresh data</>}</button>
@@ -98,15 +105,19 @@ function DashboardView({ dashboard, refreshing, onRefresh, onManage, onAdd }: { 
       </div>
       <aside className="insight-column">
         <span className="section-kicker">AI-GENERATED CONTEXT</span><h2>Possible connections</h2>
-        {dashboard.summaries.map((summary) => {
+        {dashboard.summaries.length ? dashboard.summaries.map((summary) => {
           const asset = dashboard.assets.find((item) => item.id === summary.assetId)
           const sources = dashboard.articles.filter((article) => summary.articleIds.includes(article.id))
           return <article className="insight-card" key={summary.id}><div className="insight-icon">✦</div><span className="chip violet">AI-generated context</span><h3>{asset?.name}</h3><p>{summary.summary}</p><div className="source-list">{sources.map((source) => <a key={source.id} href={source.url} target="_blank" rel="noreferrer">{source.source} ↗</a>)}</div></article>
-        })}
+        }) : <p className="empty-copy">No AI context is stored yet.</p>}
         <p className="disclaimer">AI-generated market context may be incomplete or incorrect. Verify important conclusions using the linked sources.</p>
       </aside>
     </section>
   </section>
+}
+
+function FirstUseDashboard({ onAdd }: { onAdd: () => void }) {
+  return <section className="page dashboard-page first-use"><div className="eyebrow">YOUR MARKET CONTEXT</div><h1>Start your MarketLens<br /><em>watchlist.</em></h1><p>Add a stock, ETF, or major index to see market movements in context.</p><button className="button primary" onClick={onAdd}>+ Add asset</button></section>
 }
 
 function AssetCard({ asset, onManage }: { asset: Asset; onManage: () => void }) {
