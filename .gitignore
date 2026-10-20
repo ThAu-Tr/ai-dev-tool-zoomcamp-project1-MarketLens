@@ -10,6 +10,9 @@ venv/
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
 
 # Environment and local tooling
 .env
