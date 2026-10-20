@@ -15,8 +15,8 @@ class ApiModel(BaseModel):
 
 class LotResponse(ApiModel):
     id: str
-    quantity: Decimal
-    purchasePrice: Decimal
+    quantity: str
+    purchasePrice: str
 
 
 class AssetResponse(ApiModel):
@@ -58,4 +58,4 @@ class DashboardResponse(ApiModel):
     assets: list[AssetResponse]
     articles: list[ArticleResponse]
     summaries: list[ContextSummaryResponse]
-    lastRefreshedAt: datetime | None
+    lastRefreshedAt: str

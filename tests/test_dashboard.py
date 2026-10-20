@@ -21,9 +21,8 @@ def session_factory() -> sessionmaker[Session]:
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 
-@pytest.fixture
-def client(session_factory: sessionmaker[Session]) -> TestClient:
-    app = create_app()
+def build_client(session_factory: sessionmaker[Session], provider_gateway: object | None = None) -> TestClient:
+    app = create_app(provider_gateway)  # type: ignore[arg-type]
 
     def override_session():
         with session_factory() as session:
@@ -31,6 +30,11 @@ def client(session_factory: sessionmaker[Session]) -> TestClient:
 
     app.dependency_overrides[get_session] = override_session
     return TestClient(app)
+
+
+@pytest.fixture
+def client(session_factory: sessionmaker[Session]) -> TestClient:
+    return build_client(session_factory)
 
 
 def seed_demo_user(session: Session) -> DemoUser:
@@ -53,7 +57,7 @@ def test_dashboard_returns_persisted_populated_data_without_writing_or_provider_
     assert response.status_code == 200
     body = response.json()
     assert set(body) == {"assets", "articles", "summaries", "lastRefreshedAt"}
-    assert body["assets"][0] == {"id": "sap", "name": "SAP SE", "ticker": "SAP", "exchange": "XETRA", "type": "Stock", "status": "Owned", "price": 210.35, "currency": "EUR", "changePercent": -2.3, "asOf": "2026-10-20T09:45:00Z", "lots": [{"id": "sap-1", "quantity": 5.0, "purchasePrice": 130.0}, {"id": "sap-2", "quantity": 3.0, "purchasePrice": 150.0}], "industries": ["Enterprise software", "AI"]}
+    assert body["assets"][0] == {"id": "sap", "name": "SAP SE", "ticker": "SAP", "exchange": "XETRA", "type": "Stock", "status": "Owned", "price": 210.35, "currency": "EUR", "changePercent": -2.3, "asOf": "2026-10-20T09:45:00Z", "lots": [{"id": "sap-1", "quantity": "5.000000", "purchasePrice": "130.000000"}, {"id": "sap-2", "quantity": "3.000000", "purchasePrice": "150.000000"}], "industries": ["Enterprise software", "AI"]}
     assert [article["relevance"] for article in body["articles"]] == ["Direct asset news", "Industry news", "Market context"]
     assert body["summaries"][0]["articleIds"] == ["asset-news"]
     assert body["lastRefreshedAt"] == "2026-10-20T09:45:00Z"
@@ -71,4 +75,30 @@ def test_dashboard_returns_empty_stored_state(client: TestClient, session_factor
     response = client.get("/api/dashboard")
 
     assert response.status_code == 200
-    assert response.json() == {"assets": [], "articles": [], "summaries": [], "lastRefreshedAt": None}
+    assert response.json() == {"assets": [], "articles": [], "summaries": [], "lastRefreshedAt": "Not refreshed yet"}
+
+
+def test_dashboard_read_does_not_access_any_provider(session_factory: sessionmaker[Session]) -> None:
+    class FailingProviderGateway:
+        calls: list[str] = []
+
+        def fetch_market_data(self) -> None:
+            self.calls.append("market")
+            raise AssertionError("Dashboard reads must not fetch market data")
+
+        def fetch_news(self) -> None:
+            self.calls.append("news")
+            raise AssertionError("Dashboard reads must not fetch news")
+
+        def generate_context(self) -> None:
+            self.calls.append("ai")
+            raise AssertionError("Dashboard reads must not generate AI context")
+
+    with session_factory.begin() as session:
+        seed_demo_user(session)
+
+    provider_gateway = FailingProviderGateway()
+    response = build_client(session_factory, provider_gateway).get("/api/dashboard")
+
+    assert response.status_code == 200
+    assert provider_gateway.calls == []

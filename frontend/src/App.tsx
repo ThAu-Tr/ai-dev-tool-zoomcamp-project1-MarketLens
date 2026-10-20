@@ -85,7 +85,7 @@ function DashboardView({ dashboard, refreshing, onRefresh, onManage, onAdd }: { 
   ]
   if (!dashboard.assets.length) return <FirstUseDashboard onAdd={onAdd} />
   return <section className="page dashboard-page">
-    <div className="eyebrow">TODAY’S VIEW <span>•</span> {dashboard.lastRefreshedAt ?? 'Not refreshed yet'}</div>
+    <div className="eyebrow">TODAY’S VIEW <span>•</span> {dashboard.lastRefreshedAt}</div>
     <div className="page-heading dashboard-heading">
       <div><h1>Market movements,<br /><em>in context.</em></h1><p>Stored data appears immediately. Refresh retrieves only newer available data.</p></div>
       <button className="button primary" disabled={refreshing} onClick={onRefresh}>{refreshing ? <><span className="loader small" /> Refreshing…</> : <>↻ Refresh data</>}</button>

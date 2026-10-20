@@ -4,13 +4,16 @@ from datetime import UTC, datetime
 
 from app.repositories.dashboard import DashboardRepository
 from app.schemas import ArticleResponse, AssetResponse, ContextSummaryResponse, DashboardResponse, LotResponse
+from app.providers import ProviderGateway
 
 
 class DashboardService:
     """Read the persisted dashboard projection; this workflow never calls providers."""
 
-    def __init__(self, repository: DashboardRepository) -> None:
+    def __init__(self, repository: DashboardRepository, providers: ProviderGateway | None = None) -> None:
         self.repository = repository
+        # Kept only as an explicit architectural boundary. read_dashboard must not access it.
+        self._providers = providers
 
     def read_dashboard(self) -> DashboardResponse:
         user = self.repository.demo_user()
@@ -35,7 +38,7 @@ class DashboardService:
                     currency=asset.currency,
                     changePercent=asset.change_percent,
                     asOf=_as_utc(asset.as_of),
-                    lots=[LotResponse(id=lot.id, quantity=lot.quantity, purchasePrice=lot.purchase_price) for lot in asset.lots],
+                    lots=[LotResponse(id=lot.id, quantity=_decimal_text(lot.quantity), purchasePrice=_decimal_text(lot.purchase_price)) for lot in asset.lots],
                     industries=asset.industries,
                 )
                 for asset in assets
@@ -63,10 +66,18 @@ class DashboardService:
                 )
                 for summary in summaries
             ],
-            lastRefreshedAt=_as_utc(refresh_state.last_refreshed_at) if refresh_state and refresh_state.last_refreshed_at else None,
+            lastRefreshedAt=_timestamp_text(refresh_state.last_refreshed_at) if refresh_state and refresh_state.last_refreshed_at else "Not refreshed yet",
         )
 
 
 def _as_utc(value: datetime) -> datetime:
     """Normalize database values, including SQLite test values, to an API timestamp."""
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _timestamp_text(value: datetime) -> str:
+    return _as_utc(value).isoformat().replace("+00:00", "Z")
+
+
+def _decimal_text(value: object) -> str:
+    return format(value, "f")
