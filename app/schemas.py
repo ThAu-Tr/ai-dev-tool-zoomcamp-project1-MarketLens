@@ -59,3 +59,10 @@ class DashboardResponse(ApiModel):
     articles: list[ArticleResponse]
     summaries: list[ContextSummaryResponse]
     lastRefreshedAt: str
+
+
+class AssetSearchResult(ApiModel):
+    name: str
+    ticker: str
+    exchange: str
+    type: Literal["Stock", "ETF", "Index"]

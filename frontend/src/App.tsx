@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { dashboardApi } from './api/dashboardApi'
+import { assetSearchApi } from './api/assetSearchApi'
 import { mockApi } from './api/mockApi'
 import type { Asset, AssetSearchResult, Dashboard, Industry, Lot, Relevance, TimelineDay } from './types'
 
@@ -173,11 +174,24 @@ function LotsPanel({ asset, onClose, onSaved }: { asset: Asset; onClose: () => v
 }
 
 function AssetModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => Promise<void> }) {
-  const [status, setStatus] = useState<'Owned' | 'Interested'>('Interested'); const [query, setQuery] = useState(''); const [results, setResults] = useState<AssetSearchResult[]>([]); const [selected, setSelected] = useState<AssetSearchResult | null>(null); const [searching, setSearching] = useState(true); const [saving, setSaving] = useState(false)
-  useEffect(() => { let active = true; setSearching(true); void mockApi.searchAssets(query).then((next) => { if (active) { setResults(next); setSearching(false) } }); return () => { active = false } }, [query])
+  const [status, setStatus] = useState<'Owned' | 'Interested'>('Interested'); const [query, setQuery] = useState(''); const [results, setResults] = useState<AssetSearchResult[]>([]); const [selected, setSelected] = useState<AssetSearchResult | null>(null); const [searching, setSearching] = useState(false); const [searchError, setSearchError] = useState(''); const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    let active = true
+    const normalizedQuery = query.trim()
+    setResults([])
+    setSearchError('')
+    if (!normalizedQuery) { setSearching(false); return () => { active = false } }
+    setSearching(true)
+    void assetSearchApi.searchAssets(normalizedQuery).then((next) => {
+      if (active) { setResults(next); setSearching(false) }
+    }).catch(() => {
+      if (active) { setSearchError('The asset catalogue could not be searched. Please try again.'); setSearching(false) }
+    })
+    return () => { active = false }
+  }, [query])
   const choose = (asset: AssetSearchResult) => { setSelected(asset); setQuery(asset.name); setStatus('Interested') }
   const save = async (event: React.FormEvent) => { event.preventDefault(); if (!selected) return; setSaving(true); await mockApi.addAsset({ name: selected.name, ticker: selected.ticker, exchange: selected.exchange, type: selected.type, status: selected.type === 'Index' ? 'Interested' : status, lots: [], industries: [] }); await onSaved(); setSaving(false) }
-  return <div className="modal-backdrop" role="presentation"><form className="modal" onSubmit={save}><button type="button" className="close-button" onClick={onClose} aria-label="Close add asset form">×</button><span className="section-kicker">WATCHLIST</span><h2>Add an asset</h2><p className="muted">Search the mocked asset lookup and select a valid result.</p><label>Search assets<input value={query} onChange={(event) => { setQuery(event.target.value); setSelected(null) }} placeholder="Search by name or ticker" autoFocus /></label><div className="search-results" aria-live="polite">{searching ? <span>Searching…</span> : results.length ? results.map((asset) => <button type="button" key={`${asset.ticker}-${asset.exchange}`} className={selected?.ticker === asset.ticker ? 'search-result selected' : 'search-result'} onClick={() => choose(asset)}><strong>{asset.name}</strong><span>{asset.ticker} · {asset.exchange} · {asset.type}</span></button>) : <span>No matching assets found.</span>}</div>{selected && <div className="selected-asset"><span>Selected</span><strong>{selected.name}</strong><small>{selected.ticker} · {selected.exchange} · {selected.type}</small></div>}{selected?.type !== 'Index' && <fieldset><legend>Follow status</legend><label className="radio"><input type="radio" checked={status === 'Interested'} onChange={() => setStatus('Interested')} name="status" /> Interested</label><label className="radio"><input type="radio" checked={status === 'Owned'} onChange={() => setStatus('Owned')} name="status" /> Owned</label></fieldset>}{selected?.type === 'Index' && <p className="panel-note">Indices are followed for context and cannot be marked as owned.</p>}<button className="button primary full" disabled={!selected || saving}>{saving ? 'Adding…' : 'Add to watchlist'}</button></form></div>
+  return <div className="modal-backdrop" role="presentation"><form className="modal" onSubmit={save}><button type="button" className="close-button" onClick={onClose} aria-label="Close add asset form">×</button><span className="section-kicker">WATCHLIST</span><h2>Add an asset</h2><p className="muted">Search the supported asset catalogue and select a valid result.</p><label>Search assets<input value={query} onChange={(event) => { setQuery(event.target.value); setSelected(null) }} placeholder="Search by name or ticker" autoFocus /></label><div className="search-results" aria-live="polite">{searching ? <span>Searching…</span> : searchError ? <span role="alert">{searchError}</span> : query.trim() && results.length ? results.map((asset) => <button type="button" key={`${asset.ticker}-${asset.exchange}`} className={selected?.ticker === asset.ticker ? 'search-result selected' : 'search-result'} onClick={() => choose(asset)}><strong>{asset.name}</strong><span>{asset.ticker} · {asset.exchange} · {asset.type}</span></button>) : query.trim() ? <span>No matching assets found.</span> : <span>Enter a name or ticker to search the catalogue.</span>}</div>{selected && <div className="selected-asset"><span>Selected</span><strong>{selected.name}</strong><small>{selected.ticker} · {selected.exchange} · {selected.type}</small></div>}{selected?.type !== 'Index' && <fieldset><legend>Follow status</legend><label className="radio"><input type="radio" checked={status === 'Interested'} onChange={() => setStatus('Interested')} name="status" /> Interested</label><label className="radio"><input type="radio" checked={status === 'Owned'} onChange={() => setStatus('Owned')} name="status" /> Owned</label></fieldset>}{selected?.type === 'Index' && <p className="panel-note">Indices are followed for context and cannot be marked as owned.</p>}<button className="button primary full" disabled={!selected || saving}>{saving ? 'Adding…' : 'Add to watchlist'}</button></form></div>
 }
 
 function TimelineView({ assets }: { assets: Asset[] }) {

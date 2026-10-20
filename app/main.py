@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, HTTPException
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.providers import ProviderGateway
 from app.repositories.dashboard import DashboardRepository
-from app.schemas import DashboardResponse
+from app.repositories.catalogue import AssetCatalogueRepository
+from app.schemas import AssetSearchResult, DashboardResponse
+from app.services.catalogue import AssetCatalogueService
 from app.services.dashboard import DashboardService
 
 
@@ -19,6 +23,13 @@ def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
             return DashboardService(DashboardRepository(session), provider_gateway).read_dashboard()
         except RuntimeError as error:
             raise HTTPException(status_code=500, detail=str(error)) from error
+
+    @app.get("/api/assets/search", response_model=list[AssetSearchResult])
+    def search_assets(q: Annotated[str, Query(min_length=1)]) -> list[AssetSearchResult]:
+        try:
+            return AssetCatalogueService(AssetCatalogueRepository()).search(q)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
 
     return app
 
