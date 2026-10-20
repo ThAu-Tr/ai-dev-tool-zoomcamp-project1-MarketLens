@@ -1,0 +1,22 @@
+.asset-table {
+  grid-template-columns: 1.35fr .55fr .65fr .95fr 1.25fr auto;
+}
+
+.form-error {
+  color: #ffb2c0;
+  background: #3b2230;
+  border-radius: 7px;
+  margin: 14px 0 0;
+  padding: 10px;
+  font-size: 12px;
+}
+
+@media (max-width: 880px) {
+  .asset-table {
+    grid-template-columns: 1.1fr .65fr .8fr .95fr auto;
+  }
+
+  .asset-table > :nth-child(5) {
+    display: none;
+  }
+}

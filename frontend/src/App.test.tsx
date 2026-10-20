@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { dashboardApi } from './api/dashboardApi'
 import { assetSearchApi } from './api/assetSearchApi'
+import { assetCreateApi } from './api/assetCreateApi'
 import type { Dashboard } from './types'
 
 vi.mock('./api/dashboardApi', () => ({
@@ -13,8 +14,13 @@ vi.mock('./api/assetSearchApi', () => ({
   assetSearchApi: { searchAssets: vi.fn() },
 }))
 
+vi.mock('./api/assetCreateApi', () => ({
+  assetCreateApi: { createAsset: vi.fn() },
+}))
+
 const getDashboard = vi.mocked(dashboardApi.getDashboard)
 const searchAssets = vi.mocked(assetSearchApi.searchAssets)
+const createAsset = vi.mocked(assetCreateApi.createAsset)
 
 const populatedDashboard: Dashboard = {
   assets: [{ id: 'sap', name: 'SAP SE', ticker: 'SAP', exchange: 'XETRA', type: 'Stock', status: 'Owned', price: 210.35, currency: 'EUR', changePercent: -2.3, asOf: '2026-10-20T09:45:00Z', lots: [{ id: 'sap-1', quantity: '5', purchasePrice: '130.00' }, { id: 'sap-2', quantity: '3', purchasePrice: '150.00' }], industries: ['Enterprise software'] }],
@@ -24,7 +30,7 @@ const populatedDashboard: Dashboard = {
 }
 
 describe('dashboard', () => {
-  beforeEach(() => { vi.clearAllMocks(); searchAssets.mockResolvedValue([]) })
+  beforeEach(() => { vi.clearAllMocks(); searchAssets.mockResolvedValue([]); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
 
   it('renders persisted asset, article, and owned-lot details returned by the dashboard API', async () => {
     getDashboard.mockResolvedValue(populatedDashboard)
@@ -120,5 +126,55 @@ describe('dashboard', () => {
 
     await waitFor(() => expect(searchAssets).not.toHaveBeenCalled())
     expect(screen.queryByText('Selected')).not.toBeInTheDocument()
+  })
+
+  it('adds a selected catalogue asset, then reloads the dashboard with the saved status', async () => {
+    getDashboard.mockResolvedValueOnce({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' }).mockResolvedValueOnce({
+      assets: [{ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Owned', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet',
+    })
+    searchAssets.mockResolvedValue([{ name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock' }])
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /add asset/i }))
+    fireEvent.change(screen.getByPlaceholderText('Search by name or ticker'), { target: { value: 'ASML' } })
+    fireEvent.click(await screen.findByRole('button', { name: /ASML Holding/i }))
+    fireEvent.click(screen.getByLabelText('Owned'))
+    fireEvent.click(screen.getByRole('button', { name: 'Add to watchlist' }))
+
+    await waitFor(() => expect(createAsset).toHaveBeenCalledWith({ name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Owned' }))
+    expect(await screen.findByText('Price not refreshed')).toBeInTheDocument()
+    expect(screen.getByText('Owned')).toBeInTheDocument()
+  })
+
+  it('forces an Index selection to Interested and hides the Owned choice', async () => {
+    getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
+    searchAssets.mockResolvedValue([{ name: 'S&P 500', ticker: 'SPX', exchange: 'S&P Dow Jones Indices', type: 'Index' }])
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /add asset/i }))
+    fireEvent.change(screen.getByPlaceholderText('Search by name or ticker'), { target: { value: 'SPX' } })
+    fireEvent.click(await screen.findByRole('button', { name: /S&P 500/i }))
+
+    expect(screen.queryByLabelText('Owned')).not.toBeInTheDocument()
+    expect(screen.getByText('Indices are followed for context and cannot be marked as owned.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Add to watchlist' }))
+    await waitFor(() => expect(createAsset).toHaveBeenCalledWith({ name: 'S&P 500', ticker: 'SPX', exchange: 'S&P Dow Jones Indices', type: 'Index', status: 'Interested' }))
+  })
+
+  it('shows a create error while retaining the selected asset and status', async () => {
+    getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
+    searchAssets.mockResolvedValue([{ name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock' }])
+    createAsset.mockRejectedValue(new Error('This asset is already in your watchlist.'))
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /add asset/i }))
+    fireEvent.change(screen.getByPlaceholderText('Search by name or ticker'), { target: { value: 'ASML' } })
+    fireEvent.click(await screen.findByRole('button', { name: /ASML Holding/i }))
+    fireEvent.click(screen.getByLabelText('Owned'))
+    fireEvent.click(screen.getByRole('button', { name: 'Add to watchlist' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('This asset is already in your watchlist.')
+    expect(screen.getByText('Selected')).toBeInTheDocument()
+    expect(screen.getByLabelText('Owned')).toBeChecked()
   })
 })

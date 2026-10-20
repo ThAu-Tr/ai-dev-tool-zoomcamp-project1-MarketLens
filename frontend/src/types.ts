@@ -11,15 +11,17 @@ export type Asset = {
   exchange: string
   type: AssetType
   status: FollowStatus
-  price: number
-  currency: string
-  changePercent: number
-  asOf: string
+  price: number | null
+  currency: string | null
+  changePercent: number | null
+  asOf: string | null
   lots: Lot[]
   industries: string[]
 }
 
 export type AssetSearchResult = Pick<Asset, 'name' | 'ticker' | 'exchange' | 'type'>
+
+export type AssetCreateRequest = Pick<Asset, 'name' | 'ticker' | 'exchange' | 'type' | 'status'>
 
 export type Article = {
   id: string

@@ -68,7 +68,10 @@ paths:
           $ref: '#/components/responses/UnexpectedError'
     post:
       summary: Add an asset to the watchlist
-      description: Indices must use the Interested status and must not include purchase lots.
+      description: |
+        Adds an exact selection from the supported catalogue. The backend derives
+        linked industries and initializes empty lots. Quote fields remain null
+        until a later refresh retrieves market data.
       security: []
       requestBody:
         required: true
@@ -326,10 +329,10 @@ components:
         exchange: { type: string, example: XETRA }
         type: { $ref: '#/components/schemas/AssetType' }
         status: { $ref: '#/components/schemas/FollowStatus' }
-        price: { type: number, example: 210.35 }
-        currency: { type: string, example: EUR }
-        changePercent: { type: number, example: -2.3 }
-        asOf: { type: string, example: '2026-10-19T16:40:00Z' }
+        price: { type: [number, 'null'], example: 210.35 }
+        currency: { type: [string, 'null'], example: EUR }
+        changePercent: { type: [number, 'null'], example: -2.3 }
+        asOf: { type: [string, 'null'], format: date-time, example: '2026-10-19T16:40:00Z' }
         lots:
           type: array
           items: { $ref: '#/components/schemas/Lot' }
@@ -338,19 +341,14 @@ components:
           items: { type: string }
     AssetCreate:
       type: object
-      required: [name, ticker, exchange, type, status, lots, industries]
+      description: A complete selection from GET /api/assets/search plus the chosen follow status. The server derives lots and industries.
+      required: [name, ticker, exchange, type, status]
       properties:
         name: { type: string, example: SAP SE }
         ticker: { type: string, example: SAP }
         exchange: { type: string, example: XETRA }
         type: { $ref: '#/components/schemas/AssetType' }
         status: { $ref: '#/components/schemas/FollowStatus' }
-        lots:
-          type: array
-          items: { $ref: '#/components/schemas/LotInput' }
-        industries:
-          type: array
-          items: { type: string }
     AssetSearchResult:
       type: object
       required: [name, ticker, exchange, type]

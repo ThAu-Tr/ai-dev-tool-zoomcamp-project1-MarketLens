@@ -29,3 +29,15 @@ class AssetCatalogueService:
                 seen.add(key)
                 results.append(result)
         return results
+
+    def selected_entry(self, *, name: str, ticker: str, exchange: str, asset_type: str) -> dict[str, object] | None:
+        """Return the exact server catalogue record, never browser-supplied metadata."""
+        for entry in self.repository.entries():
+            if all(entry[key] == value for key, value in {
+                "name": name,
+                "ticker": ticker,
+                "exchange": exchange,
+                "type": asset_type,
+            }.items()):
+                return entry
+        return None

@@ -37,7 +37,7 @@ class DashboardService:
                     price=asset.price,
                     currency=asset.currency,
                     changePercent=asset.change_percent,
-                    asOf=_as_utc(asset.as_of),
+                    asOf=_as_utc(asset.as_of) if asset.as_of else None,
                     lots=[LotResponse(id=lot.id, quantity=_decimal_text(lot.quantity), purchasePrice=_decimal_text(lot.purchase_price)) for lot in asset.lots],
                     industries=asset.industries,
                 )

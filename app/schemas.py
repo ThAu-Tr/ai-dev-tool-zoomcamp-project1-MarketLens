@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 
 class ApiModel(BaseModel):
@@ -26,10 +26,10 @@ class AssetResponse(ApiModel):
     exchange: str
     type: Literal["Stock", "ETF", "Index"]
     status: Literal["Owned", "Interested"]
-    price: Decimal
-    currency: str
-    changePercent: Decimal
-    asOf: datetime
+    price: Decimal | None
+    currency: str | None
+    changePercent: Decimal | None
+    asOf: datetime | None
     lots: list[LotResponse]
     industries: list[str]
 
@@ -66,3 +66,15 @@ class AssetSearchResult(ApiModel):
     ticker: str
     exchange: str
     type: Literal["Stock", "ETF", "Index"]
+
+
+class AssetCreateRequest(ApiModel):
+    """A catalogue selection. Industries and quote values are server-owned."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    ticker: str
+    exchange: str
+    type: Literal["Stock", "ETF", "Index"]
+    status: Literal["Owned", "Interested"]

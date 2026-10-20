@@ -7,9 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.providers import ProviderGateway
-from app.repositories.dashboard import DashboardRepository
 from app.repositories.catalogue import AssetCatalogueRepository
-from app.schemas import AssetSearchResult, DashboardResponse
+from app.repositories.dashboard import DashboardRepository
+from app.repositories.assets import AssetRepository
+from app.schemas import AssetCreateRequest, AssetResponse, AssetSearchResult, DashboardResponse
+from app.services.assets import AssetCreationService
 from app.services.catalogue import AssetCatalogueService
 from app.services.dashboard import DashboardService
 
@@ -30,6 +32,17 @@ def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
             return AssetCatalogueService(AssetCatalogueRepository()).search(q)
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @app.post("/api/assets", response_model=AssetResponse, status_code=201)
+    def create_asset(request: AssetCreateRequest, session: Session = Depends(get_session)) -> AssetResponse:
+        try:
+            return AssetCreationService(
+                AssetRepository(session), AssetCatalogueService(AssetCatalogueRepository())
+            ).create(request)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        except RuntimeError as error:
+            raise HTTPException(status_code=500, detail=str(error)) from error
 
     return app
 

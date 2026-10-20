@@ -18,6 +18,7 @@ class DemoUser(Base):
 
 class Asset(Base):
     __tablename__ = "assets"
+    __table_args__ = (UniqueConstraint("user_id", "ticker", "exchange", name="uq_assets_user_ticker_exchange"),)
 
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("demo_users.id"), index=True)
@@ -26,10 +27,10 @@ class Asset(Base):
     exchange: Mapped[str] = mapped_column(String(120))
     asset_type: Mapped[str] = mapped_column(String(16))
     status: Mapped[str] = mapped_column(String(16))
-    price: Mapped[Decimal] = mapped_column(Numeric(20, 6))
-    currency: Mapped[str] = mapped_column(String(8))
-    change_percent: Mapped[Decimal] = mapped_column(Numeric(12, 6))
-    as_of: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    price: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    change_percent: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
+    as_of: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     industries: Mapped[list[str]] = mapped_column(JSON, default=list)
     lots: Mapped[list[PurchaseLot]] = relationship(back_populates="asset", cascade="all, delete-orphan")
 
