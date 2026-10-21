@@ -2,7 +2,7 @@ export type AssetType = 'Stock' | 'ETF' | 'Index'
 export type FollowStatus = 'Owned' | 'Interested'
 export type Relevance = 'Direct asset news' | 'Industry news' | 'Market context'
 
-export type Lot = { id: string; quantity: string; purchasePrice: string }
+export type Lot = { id: string; quantity: string; purchasePrice: string; purchaseDate?: string | null }
 
 export type Asset = {
   id: string

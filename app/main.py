@@ -11,8 +11,9 @@ from app.repositories.catalogue import AssetCatalogueRepository
 from app.repositories.dashboard import DashboardRepository
 from app.repositories.assets import AssetRepository
 from app.repositories.industries import IndustryRepository
-from app.schemas import AssetCreateRequest, AssetResponse, AssetSearchResult, DashboardResponse, IndustryFollowRequest, IndustryResponse, RefreshResponse
-from app.services.assets import AssetCreationService, AssetRemovalService
+from app.schemas import AssetCreateRequest, AssetResponse, AssetSearchResult, DashboardResponse, IndustryFollowRequest, IndustryResponse, LotsReplaceRequest
+from app.services.assets import AssetCreationService, AssetRemovalService, LotService
+from app.schemas import RefreshResponse
 from app.services.catalogue import AssetCatalogueService
 from app.services.dashboard import DashboardService
 from app.services.industries import IndustryService
@@ -64,6 +65,17 @@ def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
             return AssetCreationService(
                 AssetRepository(session), AssetCatalogueService(AssetCatalogueRepository())
             ).create(request)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        except RuntimeError as error:
+            raise HTTPException(status_code=500, detail=str(error)) from error
+
+    @app.put("/api/assets/{asset_id}/lots", response_model=AssetResponse)
+    def replace_lots(asset_id: str, request: LotsReplaceRequest, session: Session = Depends(get_session)) -> AssetResponse:
+        try:
+            return LotService(AssetRepository(session)).replace(asset_id, request)
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         except RuntimeError as error:

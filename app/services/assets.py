@@ -1,11 +1,52 @@
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from uuid import uuid4
 
-from app.models import Asset
+from app.models import Asset, PurchaseLot
 from app.repositories.assets import AssetRepository
 from app.services.catalogue import AssetCatalogueService
-from app.schemas import AssetCreateRequest, AssetResponse, LotResponse
+from app.schemas import AssetCreateRequest, AssetResponse, LotResponse, LotsReplaceRequest
+
+
+def _lot_response(lot: PurchaseLot) -> LotResponse:
+    return LotResponse(id=lot.id, quantity=f"{lot.quantity:.6f}", purchasePrice=f"{lot.purchase_price:.6f}", purchaseDate=lot.purchase_date)
+
+
+class LotService:
+    def __init__(self, repository: AssetRepository) -> None:
+        self.repository = repository
+
+    def replace(self, asset_id: str, request: LotsReplaceRequest) -> AssetResponse:
+        user = self.repository.demo_user()
+        if user is None:
+            raise RuntimeError("The seeded demo user is missing. Run database migrations before serving requests.")
+        asset = self.repository.asset_for(user_id=user.id, asset_id=asset_id)
+        if asset is None:
+            raise LookupError("The requested asset was not found.")
+        if asset.asset_type == "Index":
+            raise ValueError("Indices cannot have purchase lots.")
+        if asset.status != "Owned":
+            raise ValueError("Only owned assets can have purchase lots.")
+        if not request.lots:
+            raise ValueError("An owned asset must have at least one active purchase lot.")
+        lots: list[PurchaseLot] = []
+        seen: set[str] = set()
+        try:
+            for item in request.lots:
+                if not item.id or item.id in seen:
+                    raise ValueError("Lot IDs must be unique.")
+                quantity, price = Decimal(item.quantity), Decimal(item.purchasePrice)
+                if not quantity.is_finite() or not price.is_finite() or quantity <= 0 or price <= 0:
+                    raise ValueError("Lot quantity and purchase price must be positive decimals.")
+                seen.add(item.id)
+                lots.append(PurchaseLot(id=item.id, asset_id=asset.id, quantity=quantity, purchase_price=price, purchase_date=item.purchaseDate))
+        except (InvalidOperation, ValueError) as error:
+            raise ValueError(str(error) or "Lot quantity and purchase price must be positive decimals.") from error
+        self.repository.replace_lots(asset, lots)
+        return AssetResponse(id=asset.id, name=asset.name, ticker=asset.ticker, exchange=asset.exchange,
+            type=asset.asset_type, status=asset.status, price=asset.price, currency=asset.currency,
+            changePercent=asset.change_percent, asOf=asset.as_of, lots=[_lot_response(lot) for lot in asset.lots], industries=asset.industries)
 
 
 class AssetCreationService:
@@ -47,7 +88,7 @@ class AssetCreationService:
         return AssetResponse(
             id=asset.id, name=asset.name, ticker=asset.ticker, exchange=asset.exchange,
             type=asset.asset_type, status=asset.status, price=None, currency=None,
-            changePercent=None, asOf=None, lots=[LotResponse(id=lot.id, quantity=str(lot.quantity), purchasePrice=str(lot.purchase_price)) for lot in asset.lots],
+            changePercent=None, asOf=None, lots=[_lot_response(lot) for lot in asset.lots],
             industries=asset.industries,
         )
 

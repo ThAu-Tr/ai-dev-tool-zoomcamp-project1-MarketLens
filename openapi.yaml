@@ -309,6 +309,7 @@ components:
         id: { type: string, example: sap-1 }
         quantity: { type: string, pattern: '^[0-9]+(\.[0-9]+)?$', example: '5' }
         purchasePrice: { type: string, pattern: '^[0-9]+(\.[0-9]+)?$', example: '130.00' }
+        purchaseDate: { type: [string, 'null'], format: date, example: '2026-10-20' }
     LotInput:
       type: object
       required: [id, quantity, purchasePrice]
@@ -319,6 +320,7 @@ components:
           example: sap-1
         quantity: { type: string, pattern: '^[0-9]+(\.[0-9]+)?$', example: '5' }
         purchasePrice: { type: string, pattern: '^[0-9]+(\.[0-9]+)?$', example: '130.00' }
+        purchaseDate: { type: [string, 'null'], format: date, example: '2026-10-20' }
     Asset:
       type: object
       required: [id, name, ticker, exchange, type, status, price, currency, changePercent, asOf, lots, industries]

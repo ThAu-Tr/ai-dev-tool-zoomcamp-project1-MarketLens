@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Article, Asset, ContextSummary, DemoUser
+from app.models import Article, Asset, ContextSummary, DemoUser, PurchaseLot
 
 
 class AssetRepository:
@@ -26,6 +26,15 @@ class AssetRepository:
 
     def asset_for(self, *, user_id: int, asset_id: str) -> Asset | None:
         return self.session.scalar(select(Asset).where(Asset.user_id == user_id, Asset.id == asset_id))
+
+    def replace_lots(self, asset: Asset, lots: list[PurchaseLot]) -> Asset:
+        self.session.query(PurchaseLot).filter(PurchaseLot.asset_id == asset.id).delete(synchronize_session=False)
+        self.session.flush()
+        self.session.add_all(lots)
+        self.session.flush()
+        self.session.commit()
+        self.session.refresh(asset)
+        return asset
 
     def remove_active_asset_context(self, asset: Asset) -> None:
         """Remove current-dashboard data only; timeline/archive records are separate."""

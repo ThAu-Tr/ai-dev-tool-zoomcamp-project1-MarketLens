@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import DateTime, ForeignKey, JSON, Numeric, String, Text, UniqueConstraint
@@ -56,6 +56,7 @@ class PurchaseLot(Base):
     asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id"), index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6))
     purchase_price: Mapped[Decimal] = mapped_column(Numeric(20, 6))
+    purchase_date: Mapped[date | None] = mapped_column(nullable=True)
     asset: Mapped[Asset] = relationship(back_populates="lots")
 
 

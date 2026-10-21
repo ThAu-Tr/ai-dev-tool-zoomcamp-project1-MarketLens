@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, field_serializer, model_serializer
 
 
 class ApiModel(BaseModel):
@@ -17,6 +17,27 @@ class LotResponse(ApiModel):
     id: str
     quantity: str
     purchasePrice: str
+    purchaseDate: date | None = None
+
+    @model_serializer(mode="wrap")
+    def serialize_lot(self, handler: object) -> dict[str, object]:
+        result = handler(self)
+        if self.purchaseDate is None:
+            result.pop("purchaseDate", None)
+        return result
+
+
+class LotInput(ApiModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    quantity: str
+    purchasePrice: str
+    purchaseDate: date | None = None
+
+
+class LotsReplaceRequest(ApiModel):
+    model_config = ConfigDict(extra="forbid")
+    lots: list[LotInput]
 
 
 class AssetResponse(ApiModel):
