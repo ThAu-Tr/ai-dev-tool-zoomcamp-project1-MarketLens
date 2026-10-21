@@ -6,6 +6,7 @@ import { assetSearchApi } from './api/assetSearchApi'
 import { assetCreateApi } from './api/assetCreateApi'
 import { industryApi } from './api/industryApi'
 import { assetRemoveApi } from './api/assetRemoveApi'
+import { replaceLots } from './api/lotsApi'
 import type { Dashboard } from './types'
 
 vi.mock('./api/dashboardApi', () => ({
@@ -27,6 +28,7 @@ vi.mock('./api/industryApi', () => ({
 vi.mock('./api/assetRemoveApi', () => ({
   assetRemoveApi: { removeAsset: vi.fn() },
 }))
+vi.mock('./api/lotsApi', () => ({ replaceLots: vi.fn() }))
 
 const getDashboard = vi.mocked(dashboardApi.getDashboard)
 const searchAssets = vi.mocked(assetSearchApi.searchAssets)
@@ -34,6 +36,7 @@ const createAsset = vi.mocked(assetCreateApi.createAsset)
 const getIndustries = vi.mocked(industryApi.getIndustries)
 const setIndustryFollowed = vi.mocked(industryApi.setFollowed)
 const removeAsset = vi.mocked(assetRemoveApi.removeAsset)
+const saveLots = vi.mocked(replaceLots)
 
 const populatedDashboard: Dashboard = {
   assets: [{ id: 'sap', name: 'SAP SE', ticker: 'SAP', exchange: 'XETRA', type: 'Stock', status: 'Owned', price: 210.35, currency: 'EUR', changePercent: -2.3, asOf: '2026-10-20T09:45:00Z', lots: [{ id: 'sap-1', quantity: '5', purchasePrice: '130.00' }, { id: 'sap-2', quantity: '3', purchasePrice: '150.00' }], industries: ['Enterprise software'] }],
@@ -43,7 +46,7 @@ const populatedDashboard: Dashboard = {
 }
 
 describe('dashboard', () => {
-  beforeEach(() => { vi.clearAllMocks(); searchAssets.mockResolvedValue([]); getIndustries.mockResolvedValue([]); removeAsset.mockResolvedValue(); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
+  beforeEach(() => { vi.clearAllMocks(); searchAssets.mockResolvedValue([]); getIndustries.mockResolvedValue([]); removeAsset.mockResolvedValue(); saveLots.mockResolvedValue(populatedDashboard.assets[0]); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
 
   it('separates followed and available industries, and moves an industry after a successful save', async () => {
     getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
@@ -270,6 +273,29 @@ describe('dashboard', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('This asset is already in your watchlist.')
     expect(screen.getByText('Selected')).toBeInTheDocument()
     expect(screen.getByLabelText('Owned')).toBeChecked()
+  })
+
+  it('adds, edits, and saves a purchase lot including its purchase date', async () => {
+    getDashboard.mockResolvedValue(populatedDashboard)
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /manage lots/i }))
+    fireEvent.click(screen.getByRole('button', { name: /add lot/i }))
+    fireEvent.change(screen.getByLabelText('Lot 3 quantity'), { target: { value: '2.5' } })
+    fireEvent.change(screen.getByLabelText('Lot 3 price'), { target: { value: '99.10' } })
+    fireEvent.change(screen.getByLabelText('Lot 3 purchase date'), { target: { value: '2026-05-01' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save lots' }))
+    await waitFor(() => expect(saveLots).toHaveBeenCalledWith('sap', expect.arrayContaining([expect.objectContaining({ quantity: '2.5', purchasePrice: '99.10', purchaseDate: '2026-05-01' })])))
+  })
+
+  it('keeps edited lot input and shows an actionable save error', async () => {
+    getDashboard.mockResolvedValue(populatedDashboard)
+    saveLots.mockRejectedValue(new Error('Purchase date cannot be in the future.'))
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /manage lots/i }))
+    fireEvent.change(screen.getByLabelText('Lot 1 quantity'), { target: { value: '7.125' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save lots' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Purchase date cannot be in the future.')
+    expect(screen.getByLabelText('Lot 1 quantity')).toHaveValue('7.125')
   })
 
   it('confirms asset removal and leaves the watchlist unchanged when cancelled', async () => {
