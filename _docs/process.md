@@ -29,4 +29,4 @@ Rules
 - Do not skip step 2
 - The engineer does not close the issue
 - QA does not fix the code, only outputs PASS or FAIL
-- The orchestrator closes the issue only after QA outputs PASS
+- The orchestrator merges the approved work and closes the issue only after QA outputs PASS
