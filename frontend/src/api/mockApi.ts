@@ -1,4 +1,4 @@
-import type { Asset, AssetSearchResult, Dashboard, Industry, Lot, TimelineDay } from '../types'
+import type { Asset, AssetSearchResult, Dashboard, Lot, TimelineDay } from '../types'
 
 const delay = (ms = 380) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
@@ -6,14 +6,6 @@ let assets: Asset[] = [
   { id: 'sap', name: 'SAP SE', ticker: 'SAP', exchange: 'XETRA', type: 'Stock', status: 'Owned', price: 210.35, currency: 'EUR', changePercent: -2.3, asOf: 'Today, 16:40', lots: [{ id: 'sap-1', quantity: '5', purchasePrice: '130.00' }, { id: 'sap-2', quantity: '3', purchasePrice: '150.00' }], industries: ['Enterprise software', 'AI'] },
   { id: 'smh', name: 'VanEck Semiconductor ETF', ticker: 'SMH', exchange: 'NASDAQ', type: 'ETF', status: 'Interested', price: 346.82, currency: 'USD', changePercent: 1.14, asOf: 'Today, 16:35', lots: [], industries: ['Semiconductors', 'AI'] },
   { id: 'dax', name: 'DAX', ticker: 'DAX', exchange: 'XETRA', type: 'Index', status: 'Interested', price: 22418.25, currency: 'EUR', changePercent: -0.68, asOf: 'Today, 17:30', lots: [], industries: ['European market'] },
-]
-
-let industries: Industry[] = [
-  { id: 'software', name: 'Enterprise software', followed: true, suggestedBy: ['SAP'] },
-  { id: 'semi', name: 'Semiconductors', followed: true, suggestedBy: ['SMH'] },
-  { id: 'ai', name: 'AI', followed: false, suggestedBy: ['SAP', 'SMH'] },
-  { id: 'energy', name: 'Renewable energy', followed: false, suggestedBy: [] },
-  { id: 'banking', name: 'Banking', followed: false, suggestedBy: [] },
 ]
 
 const articles: Dashboard['articles'] = [
@@ -64,8 +56,6 @@ export const mockApi = {
     await delay(280)
     assets = assets.filter((asset) => asset.id !== assetId)
   },
-  async getIndustries(): Promise<Industry[]> { await delay(); return industries.map((industry) => ({ ...industry, suggestedBy: [...industry.suggestedBy] })) },
-  async toggleIndustry(id: string): Promise<void> { await delay(200); industries = industries.map((industry) => industry.id === id ? { ...industry, followed: !industry.followed } : industry) },
   async getTimeline(date: string): Promise<TimelineDay> {
     await delay(archive.has(date) ? 240 : 900)
     const existing = archive.get(date)

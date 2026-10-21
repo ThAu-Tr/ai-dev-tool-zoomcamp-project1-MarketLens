@@ -4,6 +4,7 @@ import App from './App'
 import { dashboardApi } from './api/dashboardApi'
 import { assetSearchApi } from './api/assetSearchApi'
 import { assetCreateApi } from './api/assetCreateApi'
+import { industryApi } from './api/industryApi'
 import type { Dashboard } from './types'
 
 vi.mock('./api/dashboardApi', () => ({
@@ -18,9 +19,15 @@ vi.mock('./api/assetCreateApi', () => ({
   assetCreateApi: { createAsset: vi.fn() },
 }))
 
+vi.mock('./api/industryApi', () => ({
+  industryApi: { getIndustries: vi.fn(), setFollowed: vi.fn() },
+}))
+
 const getDashboard = vi.mocked(dashboardApi.getDashboard)
 const searchAssets = vi.mocked(assetSearchApi.searchAssets)
 const createAsset = vi.mocked(assetCreateApi.createAsset)
+const getIndustries = vi.mocked(industryApi.getIndustries)
+const setIndustryFollowed = vi.mocked(industryApi.setFollowed)
 
 const populatedDashboard: Dashboard = {
   assets: [{ id: 'sap', name: 'SAP SE', ticker: 'SAP', exchange: 'XETRA', type: 'Stock', status: 'Owned', price: 210.35, currency: 'EUR', changePercent: -2.3, asOf: '2026-10-20T09:45:00Z', lots: [{ id: 'sap-1', quantity: '5', purchasePrice: '130.00' }, { id: 'sap-2', quantity: '3', purchasePrice: '150.00' }], industries: ['Enterprise software'] }],
@@ -30,7 +37,38 @@ const populatedDashboard: Dashboard = {
 }
 
 describe('dashboard', () => {
-  beforeEach(() => { vi.clearAllMocks(); searchAssets.mockResolvedValue([]); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
+  beforeEach(() => { vi.clearAllMocks(); searchAssets.mockResolvedValue([]); getIndustries.mockResolvedValue([]); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
+
+  it('separates followed and available industries, and moves an industry after a successful save', async () => {
+    getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
+    getIndustries.mockResolvedValue([{ id: 'semi', name: 'Semiconductors', followed: true }, { id: 'energy', name: 'Renewable energy', followed: false }])
+    setIndustryFollowed.mockResolvedValue({ id: 'energy', name: 'Renewable energy', followed: true })
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Watchlist' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Industries 1/ }))
+    expect(await screen.findByText('Semiconductors')).toBeInTheDocument()
+    expect(screen.getByText('Renewable energy')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Follow' }))
+
+    await waitFor(() => expect(setIndustryFollowed).toHaveBeenCalledWith('energy', true))
+    expect(await screen.findAllByRole('button', { name: 'Unfollow' })).toHaveLength(2)
+  })
+
+  it('keeps displayed industries usable and shows an error when a follow save fails', async () => {
+    getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
+    getIndustries.mockResolvedValue([{ id: 'semi', name: 'Semiconductors', followed: true }])
+    setIndustryFollowed.mockRejectedValue(new Error('offline'))
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Watchlist' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Industries 1/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Unfollow' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Industry follow state could not be saved')
+    expect(screen.getByText('Semiconductors')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unfollow' })).toBeInTheDocument()
+  })
 
   it('renders persisted asset, article, and owned-lot details returned by the dashboard API', async () => {
     getDashboard.mockResolvedValue(populatedDashboard)

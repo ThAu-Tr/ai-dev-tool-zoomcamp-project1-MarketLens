@@ -10,10 +10,12 @@ from app.providers import ProviderGateway
 from app.repositories.catalogue import AssetCatalogueRepository
 from app.repositories.dashboard import DashboardRepository
 from app.repositories.assets import AssetRepository
-from app.schemas import AssetCreateRequest, AssetResponse, AssetSearchResult, DashboardResponse
+from app.repositories.industries import IndustryRepository
+from app.schemas import AssetCreateRequest, AssetResponse, AssetSearchResult, DashboardResponse, IndustryFollowRequest, IndustryResponse
 from app.services.assets import AssetCreationService
 from app.services.catalogue import AssetCatalogueService
 from app.services.dashboard import DashboardService
+from app.services.industries import IndustryService
 
 
 def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
@@ -43,6 +45,23 @@ def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
             raise HTTPException(status_code=422, detail=str(error)) from error
         except RuntimeError as error:
             raise HTTPException(status_code=500, detail=str(error)) from error
+
+    @app.get("/api/industries", response_model=list[IndustryResponse])
+    def list_industries(session: Session = Depends(get_session)) -> list[IndustryResponse]:
+        try:
+            return IndustryService(IndustryRepository(session)).list()
+        except RuntimeError as error:
+            raise HTTPException(status_code=500, detail=str(error)) from error
+
+    @app.put("/api/industries/{industry_id}/follow", response_model=IndustryResponse)
+    def set_industry_follow_state(industry_id: str, request: IndustryFollowRequest, session: Session = Depends(get_session)) -> IndustryResponse:
+        try:
+            industry = IndustryService(IndustryRepository(session)).set_followed(industry_id, request.followed)
+        except RuntimeError as error:
+            raise HTTPException(status_code=500, detail=str(error)) from error
+        if industry is None:
+            raise HTTPException(status_code=404, detail="The requested industry was not found.")
+        return industry
 
     return app
 

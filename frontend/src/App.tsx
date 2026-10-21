@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { dashboardApi } from './api/dashboardApi'
 import { assetSearchApi } from './api/assetSearchApi'
 import { assetCreateApi } from './api/assetCreateApi'
+import { industryApi } from './api/industryApi'
 import './asset-create.css'
 import { mockApi } from './api/mockApi'
 import type { Asset, AssetSearchResult, Dashboard, Industry, Lot, Relevance, TimelineDay } from './types'
@@ -18,6 +19,7 @@ export default function App() {
   const [view, setView] = useState<View>('dashboard')
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [industries, setIndustries] = useState<Industry[]>([])
+  const [industryError, setIndustryError] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
@@ -35,8 +37,11 @@ export default function App() {
   }
 
   const loadIndustries = async () => {
-    const nextIndustries = await mockApi.getIndustries()
-    setIndustries(nextIndustries)
+    try {
+      const nextIndustries = await industryApi.getIndustries()
+      setIndustries(nextIndustries)
+      setIndustryError('')
+    } catch { setIndustryError('Industries could not be loaded. Please try again.') }
   }
 
   useEffect(() => { void load() }, [])
@@ -50,7 +55,14 @@ export default function App() {
   }
 
   const navigate = (next: View) => { setView(next); setError('') }
-  const onAssetSaved = async () => { setAddOpen(false); setSelectedAsset(null); await Promise.all([load(), loadIndustries()]) }
+  const onAssetSaved = async () => { setAddOpen(false); setSelectedAsset(null); await load() }
+  const setIndustryFollowed = async (id: string, followed: boolean) => {
+    try {
+      const updated = await industryApi.setFollowed(id, followed)
+      setIndustries((current) => current.map((industry) => industry.id === id ? updated : industry))
+      setIndustryError('')
+    } catch { setIndustryError('Industry follow state could not be saved. Please try again.') }
+  }
 
   return (
     <div className="app-shell">
@@ -68,7 +80,7 @@ export default function App() {
         {error && <div className="error-banner" role="alert"><span>!</span>{error}<button onClick={() => void load()}>Retry</button><button onClick={() => setError('')}>Dismiss</button></div>}
         {loading && !dashboard ? <LoadingScreen /> : dashboard && <>
           {view === 'dashboard' && <DashboardView dashboard={dashboard} refreshing={refreshing} onRefresh={refresh} onManage={(asset) => { setSelectedAsset(asset); navigate('watchlist') }} onAdd={() => { setAddOpen(true); navigate('watchlist') }} />}
-          {view === 'watchlist' && <WatchlistView assets={dashboard.assets} industries={industries} initialAsset={selectedAsset} onSelect={(asset) => setSelectedAsset(asset)} onAdd={() => setAddOpen(true)} onChanged={onAssetSaved} />}
+          {view === 'watchlist' && <WatchlistView assets={dashboard.assets} industries={industries} industryError={industryError} initialAsset={selectedAsset} onSelect={(asset) => setSelectedAsset(asset)} onAdd={() => setAddOpen(true)} onChanged={onAssetSaved} onSetIndustryFollowed={setIndustryFollowed} />}
           {view === 'timeline' && <TimelineView assets={dashboard.assets} />}
         </>}
       </main>
@@ -146,24 +158,25 @@ function ArticleCard({ article }: { article: Dashboard['articles'][number] }) {
   return <a className="article-card" href={article.url} target="_blank" rel="noreferrer"><div><div className="article-meta"><span className={`dot ${article.relevance === 'Direct asset news' ? 'blue' : article.relevance === 'Industry news' ? 'amber' : 'violet'}`} />{article.source}<span>·</span>{article.publishedAt}</div><h4>{article.headline}</h4><p>{article.snippet}</p><div className="article-tags">{[...article.assets, ...article.industries].map((tag) => <span key={tag}>{tag}</span>)}</div></div><span className="external">↗</span></a>
 }
 
-function WatchlistView({ assets, industries, initialAsset, onSelect, onAdd, onChanged }: { assets: Asset[]; industries: Industry[]; initialAsset: Asset | null; onSelect: (asset: Asset) => void; onAdd: () => void; onChanged: () => Promise<void> }) {
+function WatchlistView({ assets, industries, industryError, initialAsset, onSelect, onAdd, onChanged, onSetIndustryFollowed }: { assets: Asset[]; industries: Industry[]; industryError: string; initialAsset: Asset | null; onSelect: (asset: Asset) => void; onAdd: () => void; onChanged: () => Promise<void>; onSetIndustryFollowed: (id: string, followed: boolean) => Promise<void> }) {
   const [tab, setTab] = useState<'assets' | 'industries'>('assets')
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Asset | null>(initialAsset)
   useEffect(() => { if (initialAsset) setEditing(initialAsset) }, [initialAsset])
   const filtered = assets.filter((asset) => `${asset.name} ${asset.ticker}`.toLowerCase().includes(query.toLowerCase()))
-  const toggleIndustry = async (id: string) => { await mockApi.toggleIndustry(id); await onChanged() }
   return <section className="page watchlist-page">
     <div className="eyebrow">YOUR MONITORING SETUP</div><div className="page-heading"><div><h1>Build a watchlist<br /><em>that stays meaningful.</em></h1><p>Keep assets and themes in one focused monitoring view.</p></div></div>
     <div className="tabbar"><button className={tab === 'assets' ? 'tab active' : 'tab'} onClick={() => setTab('assets')}>Assets <span>{assets.length}</span></button><button className={tab === 'industries' ? 'tab active' : 'tab'} onClick={() => setTab('industries')}>Industries <span>{industries.filter((item) => item.followed).length}</span></button></div>
-    {tab === 'assets' ? <><div className="watchlist-toolbar"><label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search assets or tickers" /></label><button className="button primary" onClick={onAdd}>+ Add asset</button></div><div className="table-card"><div className="asset-table header-row"><span>Asset</span><span>Type</span><span>Status</span><span>Price</span><span>Industries</span><span /></div>{filtered.map((asset) => <div className="asset-table" key={asset.id}><div><strong>{asset.name}</strong><small>{asset.ticker} · {asset.exchange}</small></div><span>{asset.type}</span><span className={`chip ${asset.status === 'Owned' ? 'owned' : 'interested'}`}>{asset.status}</span><span>{asset.price === null ? 'Price not refreshed' : money(asset.price, asset.currency ?? 'USD')}</span><div className="mini-tags">{asset.industries.map((industry) => <span key={industry}>{industry}</span>)}</div><button className="text-button" onClick={() => { setEditing(asset); onSelect(asset) }}>Manage →</button></div>)}</div></> : <IndustryPanel industries={industries} onToggle={toggleIndustry} />}
+    {tab === 'assets' ? <><div className="watchlist-toolbar"><label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search assets or tickers" /></label><button className="button primary" onClick={onAdd}>+ Add asset</button></div><div className="table-card"><div className="asset-table header-row"><span>Asset</span><span>Type</span><span>Status</span><span>Price</span><span>Industries</span><span /></div>{filtered.map((asset) => <div className="asset-table" key={asset.id}><div><strong>{asset.name}</strong><small>{asset.ticker} · {asset.exchange}</small></div><span>{asset.type}</span><span className={`chip ${asset.status === 'Owned' ? 'owned' : 'interested'}`}>{asset.status}</span><span>{asset.price === null ? 'Price not refreshed' : money(asset.price, asset.currency ?? 'USD')}</span><div className="mini-tags">{asset.industries.map((industry) => <span key={industry}>{industry}</span>)}</div><button className="text-button" onClick={() => { setEditing(asset); onSelect(asset) }}>Manage →</button></div>)}</div></> : <IndustryPanel industries={industries} error={industryError} onSetFollowed={onSetIndustryFollowed} />}
     {editing && <LotsPanel asset={editing} onClose={() => setEditing(null)} onSaved={onChanged} />}
   </section>
 }
 
-function IndustryPanel({ industries, onToggle }: { industries: Industry[]; onToggle: (id: string) => void }) {
-  const followed = industries.filter((industry) => industry.followed); const suggestions = industries.filter((industry) => !industry.followed && industry.suggestedBy.length); const manualChoices = industries.filter((industry) => !industry.followed && !industry.suggestedBy.length)
-  return <div className="industry-layout"><section className="industry-card"><span className="section-kicker">FOLLOWED</span><h2>Your industry lens</h2>{followed.length ? followed.map((industry) => <div className="industry-row" key={industry.id}><div><strong>{industry.name}</strong><small>{industry.suggestedBy.length ? `Linked to ${industry.suggestedBy.join(', ')}` : 'Manually followed'}</small></div><button className="icon-button" aria-label={`Unfollow ${industry.name}`} onClick={() => onToggle(industry.id)}>×</button></div>) : <p className="empty-copy">Follow industries to surface relevant context.</p>}</section><section className="industry-card suggestion"><span className="section-kicker">SUGGESTED FOR YOU</span><h2>Based on your assets</h2>{suggestions.map((industry) => <div className="industry-row" key={industry.id}><div><strong>{industry.name}</strong><small>Suggested by {industry.suggestedBy.join(' and ')}</small></div><button className="button subtle" onClick={() => onToggle(industry.id)}>Follow</button></div>)}<p className="muted">Suggestions are never followed automatically.</p></section><section className="industry-card manual-industries"><span className="section-kicker">EXPLORE INDUSTRIES</span><h2>Follow manually</h2><p className="muted">Add a theme even when it is not linked to a current asset.</p>{manualChoices.map((industry) => <div className="industry-row" key={industry.id}><strong>{industry.name}</strong><button className="button subtle" onClick={() => onToggle(industry.id)}>Follow</button></div>)}</section></div>
+function IndustryPanel({ industries, error, onSetFollowed }: { industries: Industry[]; error: string; onSetFollowed: (id: string, followed: boolean) => Promise<void> }) {
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const followed = industries.filter((industry) => industry.followed); const available = industries.filter((industry) => !industry.followed)
+  const save = async (id: string, nextFollowed: boolean) => { setSavingId(id); await onSetFollowed(id, nextFollowed); setSavingId(null) }
+  return <>{error && <div className="industry-error" role="alert">{error}</div>}<div className="industry-layout"><section className="industry-card"><span className="section-kicker">FOLLOWED</span><h2>Your industry lens <span className="count">{followed.length}</span></h2>{followed.length ? followed.map((industry) => <div className="industry-row" key={industry.id}><strong>{industry.name}</strong><button className="button subtle" disabled={savingId === industry.id} onClick={() => void save(industry.id, false)}>{savingId === industry.id ? 'Saving…' : 'Unfollow'}</button></div>) : <p className="empty-copy">Follow industries to surface relevant context.</p>}</section><section className="industry-card"><span className="section-kicker">AVAILABLE</span><h2>Available industries</h2>{available.length ? available.map((industry) => <div className="industry-row" key={industry.id}><strong>{industry.name}</strong><button className="button subtle" disabled={savingId === industry.id} onClick={() => void save(industry.id, true)}>{savingId === industry.id ? 'Saving…' : 'Follow'}</button></div>) : <p className="empty-copy">All supported industries are followed.</p>}</section></div></>
 }
 
 function LotsPanel({ asset, onClose, onSaved }: { asset: Asset; onClose: () => void; onSaved: () => Promise<void> }) {

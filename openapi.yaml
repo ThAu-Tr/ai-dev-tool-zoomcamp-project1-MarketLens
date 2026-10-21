@@ -393,12 +393,11 @@ components:
         lastRefreshedAt: { type: string, example: '2026-10-19T17:42:00Z' }
     Industry:
       type: object
-      required: [id, name, followed, suggestedBy]
+      required: [id, name, followed]
       properties:
         id: { type: string, example: semi }
         name: { type: string, example: Semiconductors }
         followed: { type: boolean, example: true }
-        suggestedBy: { type: array, items: { type: string }, example: [SMH] }
     TimelineDay:
       type: object
       required: [date, source, assets, articles, summaries]

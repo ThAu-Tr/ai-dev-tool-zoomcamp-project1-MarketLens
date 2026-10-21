@@ -49,7 +49,7 @@ export type Dashboard = {
   lastRefreshedAt: string
 }
 
-export type Industry = { id: string; name: string; followed: boolean; suggestedBy: string[] }
+export type Industry = { id: string; name: string; followed: boolean }
 
 export type TimelineDay = {
   date: string
