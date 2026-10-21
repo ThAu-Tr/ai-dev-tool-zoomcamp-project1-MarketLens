@@ -40,6 +40,7 @@ class DashboardService:
                     asOf=_as_utc(asset.as_of) if asset.as_of else None,
                     lots=[LotResponse(id=lot.id, quantity=_decimal_text(lot.quantity), purchasePrice=_decimal_text(lot.purchase_price)) for lot in asset.lots],
                     industries=asset.industries,
+                    priceStatus=("unavailable" if refresh_state and asset.ticker.upper() in (refresh_state.unavailable_tickers or []) else (refresh_state.status if refresh_state and refresh_state.status != "never" else ("current" if asset.price is not None and asset.as_of is not None else "never"))),
                 )
                 for asset in assets
             ],

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { dashboardApi } from './api/dashboardApi'
+import { refreshApi } from './api/refreshApi'
 import { assetSearchApi } from './api/assetSearchApi'
 import { assetCreateApi } from './api/assetCreateApi'
 import { industryApi } from './api/industryApi'
@@ -50,7 +51,7 @@ export default function App() {
 
   const refresh = async () => {
     setRefreshing(true)
-    try { await mockApi.refresh(); await load() }
+    try { await refreshApi.refresh(); await load() }
     catch { setError('Refresh did not complete. Your previous stored data is still shown.') }
     finally { setRefreshing(false) }
   }
@@ -149,9 +150,9 @@ function AssetCard({ asset, onManage }: { asset: Asset; onManage: () => void }) 
   return <article className="asset-card">
     <div className="asset-top"><div><span className="ticker">{asset.ticker}</span><span className="exchange">{asset.exchange}</span></div><span className={`chip ${asset.status === 'Owned' ? 'owned' : 'interested'}`}>{asset.status}</span></div>
     <h3>{asset.name}</h3><span className="asset-type">{asset.type}</span>
-    {asset.price === null || asset.currency === null || asset.changePercent === null || asset.asOf === null
-      ? <><div className="price-line"><strong>Price not refreshed</strong></div><span className="as-of">Price data will appear after the next refresh.</span></>
-      : <><div className="price-line"><strong>{money(asset.price, asset.currency)}</strong><span className={up ? 'positive movement' : 'negative movement'}>{up ? '↑' : '↓'} {pct(asset.changePercent)}</span></div><span className="as-of">As of {asset.asOf}</span></>}
+    {asset.price === null || asset.currency === null || asset.changePercent === null || asset.asOf === null || asset.priceStatus === 'unavailable'
+      ? <><div className="price-line"><strong>{asset.priceStatus === 'unavailable' ? 'Price unavailable' : 'Price not refreshed'}</strong></div><span className="as-of">{asset.priceStatus === 'unavailable' ? 'The provider did not return this symbol; previous data is retained.' : 'Price data will appear after the next refresh.'}</span></>
+      : <><div className="price-line"><strong>{money(asset.price, asset.currency)}</strong><span className={up ? 'positive movement' : 'negative movement'}>{up ? '↑' : '↓'} {pct(asset.changePercent)}</span></div><span className="as-of">{asset.priceStatus === 'stale' ? 'Stale price · ' : ''}As of {asset.asOf}</span></>}
     {asset.status === 'Owned' && <div className="holding-detail"><span>{quantity} active shares</span><span>Avg. {asset.currency ? money(average, asset.currency) : 'Not available'}</span></div>}
     <button className="card-action" onClick={onManage}>Manage {asset.status === 'Owned' ? 'lots' : 'asset'} <span>→</span></button>
   </article>

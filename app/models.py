@@ -90,3 +90,5 @@ class RefreshState(Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("demo_users.id"), primary_key=True)
     last_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="never")
+    unavailable_tickers: Mapped[list[str]] = mapped_column(JSON, default=list)

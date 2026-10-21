@@ -32,6 +32,7 @@ class AssetResponse(ApiModel):
     asOf: datetime | None
     lots: list[LotResponse]
     industries: list[str]
+    priceStatus: Literal["current", "stale", "unavailable", "never"] = "never"
 
 
 class ArticleResponse(ApiModel):
@@ -59,6 +60,10 @@ class DashboardResponse(ApiModel):
     articles: list[ArticleResponse]
     summaries: list[ContextSummaryResponse]
     lastRefreshedAt: str
+
+
+class RefreshResponse(ApiModel):
+    lastRefreshedAt: datetime
 
 
 class AssetSearchResult(ApiModel):

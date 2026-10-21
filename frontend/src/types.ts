@@ -17,6 +17,7 @@ export type Asset = {
   asOf: string | null
   lots: Lot[]
   industries: string[]
+  priceStatus?: 'current' | 'stale' | 'unavailable' | 'never'
 }
 
 export type AssetSearchResult = Pick<Asset, 'name' | 'ticker' | 'exchange' | 'type'>

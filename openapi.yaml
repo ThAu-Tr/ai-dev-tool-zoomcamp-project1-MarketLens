@@ -336,6 +336,10 @@ components:
         lots:
           type: array
           items: { $ref: '#/components/schemas/Lot' }
+        priceStatus:
+          type: string
+          enum: [current, stale, unavailable, never]
+          description: Whether the stored quote is current, stale, unavailable, or not yet loaded.
         industries:
           type: array
           items: { type: string }

@@ -11,11 +11,13 @@ from app.repositories.catalogue import AssetCatalogueRepository
 from app.repositories.dashboard import DashboardRepository
 from app.repositories.assets import AssetRepository
 from app.repositories.industries import IndustryRepository
-from app.schemas import AssetCreateRequest, AssetResponse, AssetSearchResult, DashboardResponse, IndustryFollowRequest, IndustryResponse
+from app.schemas import AssetCreateRequest, AssetResponse, AssetSearchResult, DashboardResponse, IndustryFollowRequest, IndustryResponse, RefreshResponse
 from app.services.assets import AssetCreationService, AssetRemovalService
 from app.services.catalogue import AssetCatalogueService
 from app.services.dashboard import DashboardService
 from app.services.industries import IndustryService
+from app.repositories.refresh import RefreshRepository
+from app.services.refresh import ProviderUnavailableError, RefreshService
 
 
 def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
@@ -26,6 +28,17 @@ def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
         try:
             return DashboardService(DashboardRepository(session), provider_gateway).read_dashboard()
         except RuntimeError as error:
+            raise HTTPException(status_code=500, detail=str(error)) from error
+
+    @app.post("/api/refresh", response_model=RefreshResponse)
+    def refresh(session: Session = Depends(get_session)) -> RefreshResponse:
+        try:
+            return RefreshService(RefreshRepository(session), provider_gateway).refresh()
+        except ProviderUnavailableError as error:
+            session.rollback()
+            raise HTTPException(status_code=502, detail=str(error)) from error
+        except RuntimeError as error:
+            session.rollback()
             raise HTTPException(status_code=500, detail=str(error)) from error
 
     @app.delete("/api/assets/{asset_id}", status_code=204)
