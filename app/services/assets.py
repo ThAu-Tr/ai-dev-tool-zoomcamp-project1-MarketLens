@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from uuid import uuid4
 
@@ -37,8 +38,12 @@ class LotService:
                 if not item.id or item.id in seen:
                     raise ValueError("Lot IDs must be unique.")
                 quantity, price = Decimal(item.quantity), Decimal(item.purchasePrice)
+                if any(len(part.split(".", 1)[1]) > 6 for part in (item.quantity, item.purchasePrice) if "." in part):
+                    raise ValueError("Lot quantity and purchase price support at most 6 decimal places.")
                 if not quantity.is_finite() or not price.is_finite() or quantity <= 0 or price <= 0:
                     raise ValueError("Lot quantity and purchase price must be positive decimals.")
+                if item.purchaseDate is not None and item.purchaseDate > date.today():
+                    raise ValueError("Purchase date cannot be in the future.")
                 seen.add(item.id)
                 lots.append(PurchaseLot(id=item.id, asset_id=asset.id, quantity=quantity, purchase_price=price, purchase_date=item.purchaseDate))
         except (InvalidOperation, ValueError) as error:

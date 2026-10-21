@@ -20,6 +20,7 @@ const decimalSum = (values: string[]) => decimalText(values.reduce((sum, value) 
 const decimalAdd = (left: string, right: string) => decimalText(decimalInt(left || '0') + decimalInt(right || '0'))
 const decimalMultiply = (left: string, right: string) => decimalText((decimalInt(left || '0') * decimalInt(right || '0')) / SCALE)
 const decimalDivide = (left: string, right: string) => decimalText((decimalInt(left || '0') * SCALE) / decimalInt(right || '1'))
+const weightedAverage = (lots: Lot[]) => { const quantity = lots.reduce((sum, lot) => sum + decimalInt(lot.quantity || '0'), 0n); if (quantity === 0n) return '0'; const total = lots.reduce((sum, lot) => sum + decimalInt(lot.quantity || '0') * decimalInt(lot.purchasePrice || '0'), 0n); return decimalText(total / quantity) }
 const pct = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
 const today = new Date()
 const iso = (date: Date) => date.toISOString().slice(0, 10)
@@ -154,7 +155,7 @@ function FirstUseDashboard({ onAdd }: { onAdd: () => void }) {
 function AssetCard({ asset, onManage }: { asset: Asset; onManage: () => void }) {
   const up = (asset.changePercent ?? 0) >= 0
   const quantity = decimalSum(asset.lots.map((lot) => lot.quantity))
-  const average = quantity !== '0' ? decimalDivide(asset.lots.reduce((sum, lot) => decimalAdd(sum, decimalMultiply(lot.quantity, lot.purchasePrice)), '0'), quantity) : '0'
+  const average = weightedAverage(asset.lots)
   return <article className="asset-card">
     <div className="asset-top"><div><span className="ticker">{asset.ticker}</span><span className="exchange">{asset.exchange}</span></div><span className={`chip ${asset.status === 'Owned' ? 'owned' : 'interested'}`}>{asset.status}</span></div>
     <h3>{asset.name}</h3><span className="asset-type">{asset.type}</span>
@@ -199,9 +200,9 @@ function IndustryPanel({ industries, error, onSetFollowed }: { industries: Indus
 function LotsPanel({ asset, onClose, onSaved }: { asset: Asset; onClose: () => void; onSaved: () => Promise<void> }) {
   const [lots, setLots] = useState<Lot[]>(asset.lots); const [saving, setSaving] = useState(false); const [confirmingRemoval, setConfirmingRemoval] = useState(false); const [removeError, setRemoveError] = useState(''); const [saveError, setSaveError] = useState('')
   const updateLot = (id: string, field: keyof Lot, value: string) => setLots((current) => current.map((lot) => lot.id === id ? { ...lot, [field]: value } : lot))
-  const valid = lots.length > 0 && lots.every((lot) => /^\d+(\.\d+)?$/.test(lot.quantity) && /^\d+(\.\d+)?$/.test(lot.purchasePrice) && decimalInt(lot.quantity) > 0n && decimalInt(lot.purchasePrice) > 0n)
+  const valid = lots.length > 0 && lots.every((lot) => /^\d+(\.\d{1,6})?$/.test(lot.quantity) && /^\d+(\.\d{1,6})?$/.test(lot.purchasePrice) && decimalInt(lot.quantity) > 0n && decimalInt(lot.purchasePrice) > 0n && (!lot.purchaseDate || lot.purchaseDate <= new Date().toISOString().slice(0, 10)))
   const save = async () => { if (!valid) return; setSaving(true); setSaveError(''); try { await replaceLots(asset.id, lots); await onSaved() } catch (error) { const message = error instanceof Error ? error.message : 'Unable to save lots. Your changes are still here.'; setSaveError(message); setRemoveError(message) } finally { setSaving(false) } }
-  const quantity = decimalSum(lots.map((lot) => lot.quantity || '0')); const average = quantity !== '0' ? decimalDivide(lots.reduce((sum, lot) => decimalAdd(sum, decimalMultiply(lot.quantity || '0', lot.purchasePrice || '0')), '0'), quantity) : '0'
+  const quantity = decimalSum(lots.map((lot) => lot.quantity || '0')); const average = weightedAverage(lots)
   const remove = async () => {
     setSaving(true); setRemoveError('')
     try { await assetRemoveApi.removeAsset(asset.id); await onSaved(); onClose() }
