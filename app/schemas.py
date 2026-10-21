@@ -78,3 +78,15 @@ class AssetCreateRequest(ApiModel):
     exchange: str
     type: Literal["Stock", "ETF", "Index"]
     status: Literal["Owned", "Interested"]
+
+
+class IndustryResponse(ApiModel):
+    id: str
+    name: str
+    followed: bool
+
+
+class IndustryFollowRequest(ApiModel):
+    model_config = ConfigDict(extra="forbid")
+
+    followed: bool

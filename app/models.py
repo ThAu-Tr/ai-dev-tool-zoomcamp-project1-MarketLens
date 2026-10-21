@@ -16,6 +16,20 @@ class DemoUser(Base):
     identifier: Mapped[str] = mapped_column(String(80), unique=True)
 
 
+class Industry(Base):
+    __tablename__ = "industries"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True)
+
+
+class IndustryFollow(Base):
+    __tablename__ = "industry_follows"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("demo_users.id"), primary_key=True)
+    industry_id: Mapped[str] = mapped_column(ForeignKey("industries.id"), primary_key=True)
+
+
 class Asset(Base):
     __tablename__ = "assets"
     __table_args__ = (UniqueConstraint("user_id", "ticker", "exchange", name="uq_assets_user_ticker_exchange"),)
