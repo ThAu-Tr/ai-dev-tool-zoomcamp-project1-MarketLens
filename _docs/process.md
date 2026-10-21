@@ -19,7 +19,7 @@ Lifecycle
 1. Pick the next groomed issue from the backlog (identified by label)
 2. Engineer implements it
 3. QA verifies it
-4. On FAIL, back to step 3 with the QA comment as input
+4. On FAIL, back to step 2 with the QA comment as input
 5. On PASS, close the issue
 6. Repeat until the backlog is empty
 
