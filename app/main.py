@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -12,7 +12,7 @@ from app.repositories.dashboard import DashboardRepository
 from app.repositories.assets import AssetRepository
 from app.repositories.industries import IndustryRepository
 from app.schemas import AssetCreateRequest, AssetResponse, AssetSearchResult, DashboardResponse, IndustryFollowRequest, IndustryResponse
-from app.services.assets import AssetCreationService
+from app.services.assets import AssetCreationService, AssetRemovalService
 from app.services.catalogue import AssetCatalogueService
 from app.services.dashboard import DashboardService
 from app.services.industries import IndustryService
@@ -27,6 +27,16 @@ def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
             return DashboardService(DashboardRepository(session), provider_gateway).read_dashboard()
         except RuntimeError as error:
             raise HTTPException(status_code=500, detail=str(error)) from error
+
+    @app.delete("/api/assets/{asset_id}", status_code=204)
+    def delete_asset(asset_id: str, session: Session = Depends(get_session)) -> Response:
+        try:
+            removed = AssetRemovalService(AssetRepository(session)).remove(asset_id)
+        except RuntimeError as error:
+            raise HTTPException(status_code=500, detail=str(error)) from error
+        if not removed:
+            raise HTTPException(status_code=404, detail="The requested asset was not found.")
+        return Response(status_code=204)
 
     @app.get("/api/assets/search", response_model=list[AssetSearchResult])
     def search_assets(q: Annotated[str, Query(min_length=1)]) -> list[AssetSearchResult]:

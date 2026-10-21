@@ -5,6 +5,7 @@ import { dashboardApi } from './api/dashboardApi'
 import { assetSearchApi } from './api/assetSearchApi'
 import { assetCreateApi } from './api/assetCreateApi'
 import { industryApi } from './api/industryApi'
+import { assetRemoveApi } from './api/assetRemoveApi'
 import type { Dashboard } from './types'
 
 vi.mock('./api/dashboardApi', () => ({
@@ -23,11 +24,16 @@ vi.mock('./api/industryApi', () => ({
   industryApi: { getIndustries: vi.fn(), setFollowed: vi.fn() },
 }))
 
+vi.mock('./api/assetRemoveApi', () => ({
+  assetRemoveApi: { removeAsset: vi.fn() },
+}))
+
 const getDashboard = vi.mocked(dashboardApi.getDashboard)
 const searchAssets = vi.mocked(assetSearchApi.searchAssets)
 const createAsset = vi.mocked(assetCreateApi.createAsset)
 const getIndustries = vi.mocked(industryApi.getIndustries)
 const setIndustryFollowed = vi.mocked(industryApi.setFollowed)
+const removeAsset = vi.mocked(assetRemoveApi.removeAsset)
 
 const populatedDashboard: Dashboard = {
   assets: [{ id: 'sap', name: 'SAP SE', ticker: 'SAP', exchange: 'XETRA', type: 'Stock', status: 'Owned', price: 210.35, currency: 'EUR', changePercent: -2.3, asOf: '2026-10-20T09:45:00Z', lots: [{ id: 'sap-1', quantity: '5', purchasePrice: '130.00' }, { id: 'sap-2', quantity: '3', purchasePrice: '150.00' }], industries: ['Enterprise software'] }],
@@ -37,7 +43,7 @@ const populatedDashboard: Dashboard = {
 }
 
 describe('dashboard', () => {
-  beforeEach(() => { vi.clearAllMocks(); searchAssets.mockResolvedValue([]); getIndustries.mockResolvedValue([]); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
+  beforeEach(() => { vi.clearAllMocks(); searchAssets.mockResolvedValue([]); getIndustries.mockResolvedValue([]); removeAsset.mockResolvedValue(); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
 
   it('separates followed and available industries, and moves an industry after a successful save', async () => {
     getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
@@ -214,5 +220,46 @@ describe('dashboard', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('This asset is already in your watchlist.')
     expect(screen.getByText('Selected')).toBeInTheDocument()
     expect(screen.getByLabelText('Owned')).toBeChecked()
+  })
+
+  it('confirms asset removal and leaves the watchlist unchanged when cancelled', async () => {
+    getDashboard.mockResolvedValue(populatedDashboard)
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /manage lots/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from watchlist' }))
+    expect(screen.getByText('Remove SAP from the watchlist?')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(removeAsset).not.toHaveBeenCalled()
+    expect(screen.queryByText('Remove SAP from the watchlist?')).not.toBeInTheDocument()
+    expect(screen.getAllByText('SAP SE')).toHaveLength(2)
+  })
+
+  it('removes an asset, closes management, and reloads the empty watchlist', async () => {
+    getDashboard.mockResolvedValueOnce(populatedDashboard).mockResolvedValueOnce({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /manage lots/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from watchlist' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove asset' }))
+
+    await waitFor(() => expect(removeAsset).toHaveBeenCalledWith('sap'))
+    expect(await screen.findByText('Your watchlist is empty. Add an asset to start monitoring.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove asset' })).not.toBeInTheDocument()
+  })
+
+  it('shows a retryable removal error while keeping the management panel usable', async () => {
+    getDashboard.mockResolvedValue(populatedDashboard)
+    removeAsset.mockRejectedValue(new Error('The requested asset was not found.'))
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /manage lots/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from watchlist' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove asset' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The requested asset was not found.')
+    expect(screen.getByRole('button', { name: 'Remove asset' })).toBeEnabled()
+    expect(screen.getAllByText('SAP SE')).toHaveLength(2)
   })
 })

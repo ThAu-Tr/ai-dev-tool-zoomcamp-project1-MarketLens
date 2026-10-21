@@ -50,3 +50,18 @@ class AssetCreationService:
             changePercent=None, asOf=None, lots=[LotResponse(id=lot.id, quantity=str(lot.quantity), purchasePrice=str(lot.purchase_price)) for lot in asset.lots],
             industries=asset.industries,
         )
+
+
+class AssetRemovalService:
+    def __init__(self, repository: AssetRepository) -> None:
+        self.repository = repository
+
+    def remove(self, asset_id: str) -> bool:
+        user = self.repository.demo_user()
+        if user is None:
+            raise RuntimeError("The seeded demo user is missing. Run database migrations before serving requests.")
+        asset = self.repository.asset_for(user_id=user.id, asset_id=asset_id)
+        if asset is None:
+            return False
+        self.repository.remove_active_asset_context(asset)
+        return True
