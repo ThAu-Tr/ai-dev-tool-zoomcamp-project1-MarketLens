@@ -1,8 +1,6 @@
 Documents
 
 - `_docs/process.md` - how work is organized
-- `_docs/plan.md` defines the MVP and non-goals.
-- `_docs/architecture.md` defines the selected architecture and stack.
 
 Keep changes within the MVP. Prefer small, understandable vertical changes and do not change unrelated files.
 

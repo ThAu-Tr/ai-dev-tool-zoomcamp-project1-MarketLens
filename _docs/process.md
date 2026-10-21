@@ -1,32 +1,40 @@
-- Tasks are GitHub issues, one at a time
+Work in isolated git worktrees and run up to three agents in parallel.
+
+You are the orchestrator. Your job is to:
+
+- Split the backlog into independent issue tracks.
+- Give each agent a separate worktree and clear file ownership.
+- Keep the agent slots full while eligible work remains.
+- Send completed work to a fresh reviewer.
+- Return review findings to the correct implementer.
+- Merge approved work into the main branch one issue at a time.
+- Coordinate the work. Never implement the issues yourself.
 - Read the acceptance criteria before starting and before closing
 - Commit regularly
 
 Roles
 
-- PM - grooms a task before anyone implements it, follows _docs/team/pm.md
 - Engineer - implements one groomed task, follows _docs/team/software-engineer.md
 - QA - checks the result against the acceptance criteria, follows _docs/team/qa-engineer.md
 
 
 Orchestrator
 
-The main session is the orchestrator. It launches the PM, the engineer
-and QA as subagents. It does not groom, implement or test itself.
+The main session is the orchestrator. It launches the engineer
+and QA as subagents. It does not implement or test itself.
 
 Lifecycle
 
 1. Pick the next open issue from the backlog
-2. PM grooms it
-3. Engineer implements it
-4. QA verifies it
-5. On FAIL, back to step 3 with the QA comment as input
-6. On PASS, close the issue
-7. Repeat until the backlog is empty
+2. Engineer implements it
+3. QA verifies it
+4. On FAIL, back to step 3 with the QA comment as input
+5. On PASS, close the issue
+6. Repeat until the backlog is empty
 
 Rules
 
-- You can work on up to 5 issues at the time
+- You can work on up to 3 issues at the time
 - Do not skip step 2
 - The engineer does not close the issue
 - QA does not fix the code, only outputs PASS or FAIL
