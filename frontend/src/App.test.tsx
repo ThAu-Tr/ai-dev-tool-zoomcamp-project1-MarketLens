@@ -7,6 +7,7 @@ import { assetCreateApi } from './api/assetCreateApi'
 import { industryApi } from './api/industryApi'
 import { assetRemoveApi } from './api/assetRemoveApi'
 import { replaceLots } from './api/lotsApi'
+import { updateAsset } from './api/assetUpdateApi'
 import type { Dashboard } from './types'
 
 vi.mock('./api/dashboardApi', () => ({
@@ -29,6 +30,7 @@ vi.mock('./api/assetRemoveApi', () => ({
   assetRemoveApi: { removeAsset: vi.fn() },
 }))
 vi.mock('./api/lotsApi', () => ({ replaceLots: vi.fn() }))
+vi.mock('./api/assetUpdateApi', () => ({ updateAsset: vi.fn() }))
 
 const getDashboard = vi.mocked(dashboardApi.getDashboard)
 const searchAssets = vi.mocked(assetSearchApi.searchAssets)
@@ -37,6 +39,7 @@ const getIndustries = vi.mocked(industryApi.getIndustries)
 const setIndustryFollowed = vi.mocked(industryApi.setFollowed)
 const removeAsset = vi.mocked(assetRemoveApi.removeAsset)
 const saveLots = vi.mocked(replaceLots)
+const saveStatus = vi.mocked(updateAsset)
 
 const populatedDashboard: Dashboard = {
   assets: [{ id: 'sap', name: 'SAP SE', ticker: 'SAP', exchange: 'XETRA', type: 'Stock', status: 'Owned', price: 210.35, currency: 'EUR', changePercent: -2.3, asOf: '2026-10-20T09:45:00Z', lots: [{ id: 'sap-1', quantity: '5', purchasePrice: '130.00' }, { id: 'sap-2', quantity: '3', purchasePrice: '150.00' }], industries: ['Enterprise software'] }],
@@ -46,7 +49,7 @@ const populatedDashboard: Dashboard = {
 }
 
 describe('dashboard', () => {
-  beforeEach(() => { vi.resetAllMocks(); setIndustryFollowed.mockResolvedValue({ id: 'industry', name: 'Industry', followed: false }); searchAssets.mockResolvedValue([]); getIndustries.mockResolvedValue([]); removeAsset.mockResolvedValue(); saveLots.mockResolvedValue(populatedDashboard.assets[0]); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
+  beforeEach(() => { vi.resetAllMocks(); setIndustryFollowed.mockResolvedValue({ id: 'industry', name: 'Industry', followed: false }); searchAssets.mockResolvedValue([]); getIndustries.mockResolvedValue([]); removeAsset.mockResolvedValue(); saveLots.mockResolvedValue(populatedDashboard.assets[0]); saveStatus.mockResolvedValue(populatedDashboard.assets[0]); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
 
   it('separates followed and available industries, and moves an industry after a successful save', async () => {
     getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
@@ -307,6 +310,35 @@ describe('dashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save lots' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Purchase date cannot be in the future.')
     expect(screen.getByLabelText('Lot 1 quantity')).toHaveValue('7.125')
+  })
+
+  it('changes an interested asset to owned with initial lots in one request', async () => {
+    const interested = { ...populatedDashboard.assets[0], status: 'Interested' as const, lots: [] }
+    getDashboard.mockResolvedValueOnce({ ...populatedDashboard, assets: [interested] }).mockResolvedValueOnce({ ...populatedDashboard })
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /manage asset/i }))
+    fireEvent.click(screen.getByLabelText('Owned'))
+    fireEvent.click(screen.getByRole('button', { name: /add lot/i }))
+    fireEvent.change(screen.getByLabelText('Lot 1 quantity'), { target: { value: '2' } })
+    fireEvent.change(screen.getByLabelText('Lot 1 price'), { target: { value: '100' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save ownership status' }))
+    await waitFor(() => expect(saveStatus).toHaveBeenCalledWith('sap', { status: 'Owned', lots: [expect.objectContaining({ quantity: '2', purchasePrice: '100' })] }))
+  })
+
+  it('retains the requested status and initial-lot input when changing ownership fails', async () => {
+    const interested = { ...populatedDashboard.assets[0], status: 'Interested' as const, lots: [] }
+    getDashboard.mockResolvedValue({ ...populatedDashboard, assets: [interested] })
+    saveStatus.mockRejectedValue(new Error('At least one active purchase lot is required when changing to Owned.'))
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /manage asset/i }))
+    fireEvent.click(screen.getByLabelText('Owned'))
+    fireEvent.click(screen.getByRole('button', { name: /add lot/i }))
+    fireEvent.change(screen.getByLabelText('Lot 1 quantity'), { target: { value: '2' } })
+    fireEvent.change(screen.getByLabelText('Lot 1 price'), { target: { value: '100' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save ownership status' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('At least one active purchase lot')
+    expect(screen.getByLabelText('Owned')).toBeChecked()
+    expect(screen.getByLabelText('Lot 1 quantity')).toHaveValue('2')
   })
 
   it('confirms asset removal and leaves the watchlist unchanged when cancelled', async () => {

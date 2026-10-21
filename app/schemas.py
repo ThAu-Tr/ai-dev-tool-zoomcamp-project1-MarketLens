@@ -40,6 +40,15 @@ class LotsReplaceRequest(ApiModel):
     lots: list[LotInput]
 
 
+class AssetUpdateRequest(ApiModel):
+    """Ownership changes may include the first active purchase lots."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["Owned", "Interested"]
+    lots: list[LotInput] | None = None
+
+
 class AssetResponse(ApiModel):
     id: str
     name: str

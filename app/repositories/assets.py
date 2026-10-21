@@ -36,6 +36,15 @@ class AssetRepository:
         self.session.refresh(asset)
         return asset
 
+    def update_status(self, asset: Asset, *, status: str, initial_lots: list[PurchaseLot] | None = None) -> Asset:
+        """Persist a status transition and its required initial lots together."""
+        asset.status = status
+        if initial_lots:
+            self.session.add_all(initial_lots)
+        self.session.commit()
+        self.session.refresh(asset)
+        return asset
+
     def remove_active_asset_context(self, asset: Asset) -> None:
         """Remove current-dashboard data only; timeline/archive records are separate."""
         self.session.query(ContextSummary).filter(

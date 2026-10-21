@@ -23,6 +23,7 @@ export type Asset = {
 export type AssetSearchResult = Pick<Asset, 'name' | 'ticker' | 'exchange' | 'type'>
 
 export type AssetCreateRequest = Pick<Asset, 'name' | 'ticker' | 'exchange' | 'type' | 'status'>
+export type AssetUpdateRequest = { status: FollowStatus; lots?: Lot[] }
 
 export type Article = {
   id: string
