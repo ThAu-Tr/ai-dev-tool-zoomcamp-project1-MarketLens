@@ -75,7 +75,8 @@ export default function App() {
         // Follow responses from older API versions contain only the persisted
         // state; retain supporting assets so an unfollow can restore a
         // suggestion without briefly displaying a fabricated empty state.
-        return { ...industry, ...updated, suggested: followed ? false : (updated.suggested ?? Boolean(industry.assets?.length)), assets: updated.assets ?? industry.assets ?? [] }
+        const assets = updated.assets?.length ? updated.assets : (industry.assets ?? [])
+        return { ...industry, ...updated, suggested: followed ? false : (updated.suggested ?? Boolean(assets.length)), assets }
       }))
       setIndustryError('')
     } catch { setIndustryError('Industry follow state could not be saved. Please try again.') }
@@ -199,7 +200,7 @@ function IndustryPanel({ industries, error, onSetFollowed }: { industries: Indus
 
 function LotsPanel({ asset, onClose, onSaved }: { asset: Asset; onClose: () => void; onSaved: () => Promise<void> }) {
   const [lots, setLots] = useState<Lot[]>(asset.lots); const [saving, setSaving] = useState(false); const [confirmingRemoval, setConfirmingRemoval] = useState(false); const [removeError, setRemoveError] = useState(''); const [saveError, setSaveError] = useState('')
-  const updateLot = (id: string, field: keyof Lot, value: string) => setLots((current) => current.map((lot) => lot.id === id ? { ...lot, [field]: value } : lot))
+  const updateLot = (id: string, field: keyof Lot, value: string | null) => setLots((current) => current.map((lot) => lot.id === id ? { ...lot, [field]: value } : lot))
   const valid = lots.length > 0 && lots.every((lot) => /^\d+(\.\d{1,6})?$/.test(lot.quantity) && /^\d+(\.\d{1,6})?$/.test(lot.purchasePrice) && decimalInt(lot.quantity) > 0n && decimalInt(lot.purchasePrice) > 0n && (!lot.purchaseDate || lot.purchaseDate <= new Date().toISOString().slice(0, 10)))
   const save = async () => { if (!valid) return; setSaving(true); setSaveError(''); try { await replaceLots(asset.id, lots); await onSaved() } catch (error) { const message = error instanceof Error ? error.message : 'Unable to save lots. Your changes are still here.'; setSaveError(message); setRemoveError(message) } finally { setSaving(false) } }
   const quantity = decimalSum(lots.map((lot) => lot.quantity || '0')); const average = weightedAverage(lots)
