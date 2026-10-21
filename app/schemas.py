@@ -84,6 +84,8 @@ class IndustryResponse(ApiModel):
     id: str
     name: str
     followed: bool
+    suggested: bool = False
+    assets: list[str] = []
 
 
 class IndustryFollowRequest(ApiModel):

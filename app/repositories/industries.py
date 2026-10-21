@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import DemoUser, Industry, IndustryFollow
+from app.models import Asset, DemoUser, Industry, IndustryFollow
 
 
 class IndustryRepository:
@@ -17,6 +17,9 @@ class IndustryRepository:
         followed_ids = select(IndustryFollow.industry_id).where(IndustryFollow.user_id == user_id)
         followed = set(self.session.scalars(followed_ids))
         return [(industry, industry.id in followed) for industry in self.session.scalars(select(Industry).order_by(Industry.name))]
+
+    def watchlist_assets(self, user_id: int) -> list[Asset]:
+        return list(self.session.scalars(select(Asset).where(Asset.user_id == user_id).order_by(Asset.ticker)))
 
     def industry(self, industry_id: str) -> Industry | None:
         return self.session.get(Industry, industry_id)

@@ -59,7 +59,7 @@ def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
     @app.get("/api/industries", response_model=list[IndustryResponse])
     def list_industries(session: Session = Depends(get_session)) -> list[IndustryResponse]:
         try:
-            return IndustryService(IndustryRepository(session)).list()
+            return IndustryService(IndustryRepository(session), AssetCatalogueRepository()).list()
         except RuntimeError as error:
             raise HTTPException(status_code=500, detail=str(error)) from error
 

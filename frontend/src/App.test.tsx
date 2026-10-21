@@ -61,6 +61,27 @@ describe('dashboard', () => {
     expect(await screen.findAllByRole('button', { name: 'Unfollow' })).toHaveLength(2)
   })
 
+  it('shows an actionable error when industries cannot be loaded', async () => {
+    getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
+    getIndustries.mockRejectedValue(new Error('offline'))
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Watchlist' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Industries 0/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Industries could not be loaded')
+    expect(screen.getByText('No new industry suggestions from your watchlist.')).toBeInTheDocument()
+  })
+
+  it('explains the empty suggestion state', async () => {
+    getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
+    getIndustries.mockResolvedValue([{ id: 'semi', name: 'Semiconductors', followed: true }])
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Watchlist' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Industries 1/ }))
+    expect(await screen.findByText('No new industry suggestions from your watchlist.')).toBeInTheDocument()
+  })
+
   it('keeps displayed industries usable and shows an error when a follow save fails', async () => {
     getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
     getIndustries.mockResolvedValue([{ id: 'semi', name: 'Semiconductors', followed: true }])
@@ -74,6 +95,34 @@ describe('dashboard', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Industry follow state could not be saved')
     expect(screen.getByText('Semiconductors')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Unfollow' })).toBeInTheDocument()
+  })
+
+  it('restores suggestion metadata when an unfollow response omits derived fields', async () => {
+    getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
+    getIndustries.mockResolvedValue([{ id: 'semi', name: 'Semiconductors', followed: true, assets: ['ASML'] }])
+    setIndustryFollowed.mockResolvedValue({ id: 'semi', name: 'Semiconductors', followed: false })
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Watchlist' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Industries 1/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unfollow' }))
+    expect(await screen.findByText('From ASML')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument()
+  })
+
+  it('separates watchlist suggestions, shows supporting assets, and removes one after following', async () => {
+    getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
+    getIndustries.mockResolvedValue([{ id: 'semi', name: 'Semiconductors', followed: false, suggested: true, assets: ['ASML', 'SMH'] }, { id: 'energy', name: 'Renewable energy', followed: false }])
+    setIndustryFollowed.mockResolvedValue({ id: 'semi', name: 'Semiconductors', followed: true })
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Watchlist' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Industries 0/ }))
+    expect(await screen.findByText('SUGGESTED FROM WATCHLIST')).toBeInTheDocument()
+    expect(screen.getByText('From ASML, SMH')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Follow' }))
+    await waitFor(() => expect(setIndustryFollowed).toHaveBeenCalledWith('semi', true))
+    expect(screen.queryByText('From ASML, SMH')).not.toBeInTheDocument()
   })
 
   it('renders persisted asset, article, and owned-lot details returned by the dashboard API', async () => {
@@ -188,6 +237,7 @@ describe('dashboard', () => {
     await waitFor(() => expect(createAsset).toHaveBeenCalledWith({ name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Owned' }))
     expect(await screen.findByText('Price not refreshed')).toBeInTheDocument()
     expect(screen.getByText('Owned')).toBeInTheDocument()
+    expect(getIndustries).toHaveBeenCalledTimes(2)
   })
 
   it('forces an Index selection to Interested and hides the Owned choice', async () => {
@@ -247,6 +297,7 @@ describe('dashboard', () => {
     await waitFor(() => expect(removeAsset).toHaveBeenCalledWith('sap'))
     expect(await screen.findByText('Your watchlist is empty. Add an asset to start monitoring.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Remove asset' })).not.toBeInTheDocument()
+    expect(getIndustries).toHaveBeenCalledTimes(2)
   })
 
   it('shows a retryable removal error while keeping the management panel usable', async () => {

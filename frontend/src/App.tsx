@@ -56,11 +56,17 @@ export default function App() {
   }
 
   const navigate = (next: View) => { setView(next); setError('') }
-  const onAssetSaved = async () => { setAddOpen(false); setSelectedAsset(null); await load() }
+  const onAssetSaved = async () => { setAddOpen(false); setSelectedAsset(null); await load(); if (view === 'watchlist') await loadIndustries() }
   const setIndustryFollowed = async (id: string, followed: boolean) => {
     try {
       const updated = await industryApi.setFollowed(id, followed)
-      setIndustries((current) => current.map((industry) => industry.id === id ? updated : industry))
+      setIndustries((current) => current.map((industry) => {
+        if (industry.id !== id) return industry
+        // Follow responses from older API versions contain only the persisted
+        // state; retain supporting assets so an unfollow can restore a
+        // suggestion without briefly displaying a fabricated empty state.
+        return { ...industry, ...updated, suggested: followed ? false : (updated.suggested ?? Boolean(industry.assets?.length)), assets: updated.assets ?? industry.assets ?? [] }
+      }))
       setIndustryError('')
     } catch { setIndustryError('Industry follow state could not be saved. Please try again.') }
   }
@@ -175,9 +181,10 @@ function WatchlistView({ assets, industries, industryError, initialAsset, onSele
 
 function IndustryPanel({ industries, error, onSetFollowed }: { industries: Industry[]; error: string; onSetFollowed: (id: string, followed: boolean) => Promise<void> }) {
   const [savingId, setSavingId] = useState<string | null>(null)
-  const followed = industries.filter((industry) => industry.followed); const available = industries.filter((industry) => !industry.followed)
+  const followed = industries.filter((industry) => industry.followed); const suggestions = industries.filter((industry) => industry.suggested && !industry.followed); const available = industries.filter((industry) => !industry.followed && !industry.suggested)
   const save = async (id: string, nextFollowed: boolean) => { setSavingId(id); await onSetFollowed(id, nextFollowed); setSavingId(null) }
-  return <>{error && <div className="industry-error" role="alert">{error}</div>}<div className="industry-layout"><section className="industry-card"><span className="section-kicker">FOLLOWED</span><h2>Your industry lens <span className="count">{followed.length}</span></h2>{followed.length ? followed.map((industry) => <div className="industry-row" key={industry.id}><strong>{industry.name}</strong><button className="button subtle" disabled={savingId === industry.id} onClick={() => void save(industry.id, false)}>{savingId === industry.id ? 'Saving…' : 'Unfollow'}</button></div>) : <p className="empty-copy">Follow industries to surface relevant context.</p>}</section><section className="industry-card"><span className="section-kicker">AVAILABLE</span><h2>Available industries</h2>{available.length ? available.map((industry) => <div className="industry-row" key={industry.id}><strong>{industry.name}</strong><button className="button subtle" disabled={savingId === industry.id} onClick={() => void save(industry.id, true)}>{savingId === industry.id ? 'Saving…' : 'Follow'}</button></div>) : <p className="empty-copy">All supported industries are followed.</p>}</section></div></>
+  const rows = (items: Industry[]) => items.map((industry) => <div className="industry-row" key={industry.id}><div><strong>{industry.name}</strong>{industry.assets?.length ? <small>From {industry.assets.join(', ')}</small> : null}</div><button className="button subtle" disabled={savingId === industry.id} onClick={() => void save(industry.id, !industry.followed)}>{savingId === industry.id ? 'Saving…' : industry.followed ? 'Unfollow' : 'Follow'}</button></div>)
+  return <>{error && <div className="industry-error" role="alert">{error}</div>}<div className="industry-layout"><section className="industry-card"><span className="section-kicker">FOLLOWED</span><h2>Your industry lens <span className="count">{followed.length}</span></h2>{followed.length ? rows(followed) : <p className="empty-copy">Follow industries to surface relevant context.</p>}</section><section className="industry-card suggestion"><span className="section-kicker">SUGGESTED FROM WATCHLIST</span><h2>Industries to consider</h2>{suggestions.length ? rows(suggestions) : <p className="empty-copy">No new industry suggestions from your watchlist.</p>}</section><section className="industry-card"><span className="section-kicker">AVAILABLE</span><h2>Available industries</h2>{available.length ? rows(available) : <p className="empty-copy">All supported industries are followed.</p>}</section></div></>
 }
 
 function LotsPanel({ asset, onClose, onSaved }: { asset: Asset; onClose: () => void; onSaved: () => Promise<void> }) {
