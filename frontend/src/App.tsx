@@ -5,6 +5,7 @@ import { assetSearchApi } from './api/assetSearchApi'
 import { assetCreateApi } from './api/assetCreateApi'
 import { industryApi } from './api/industryApi'
 import { assetRemoveApi } from './api/assetRemoveApi'
+import { replaceLots } from './api/lotsApi'
 import './asset-create.css'
 import { mockApi } from './api/mockApi'
 import type { Asset, AssetSearchResult, Dashboard, Industry, Lot, Relevance, TimelineDay } from './types'
@@ -12,6 +13,13 @@ import type { Asset, AssetSearchResult, Dashboard, Industry, Lot, Relevance, Tim
 type View = 'dashboard' | 'watchlist' | 'timeline'
 
 const money = (value: number, currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(value)
+const SCALE = 1000000n
+const decimalInt = (value: string) => { const [whole, fraction = ''] = value.split('.'); return BigInt(whole || '0') * SCALE + BigInt((fraction + '000000').slice(0, 6)) }
+const decimalText = (value: bigint) => { const sign = value < 0n ? '-' : ''; const absolute = value < 0n ? -value : value; const whole = absolute / SCALE; const fraction = (absolute % SCALE).toString().padStart(6, '0').replace(/0+$/, ''); return `${sign}${whole}${fraction ? `.${fraction}` : ''}` }
+const decimalSum = (values: string[]) => decimalText(values.reduce((sum, value) => sum + decimalInt(value || '0'), 0n))
+const decimalAdd = (left: string, right: string) => decimalText(decimalInt(left || '0') + decimalInt(right || '0'))
+const decimalMultiply = (left: string, right: string) => decimalText((decimalInt(left || '0') * decimalInt(right || '0')) / SCALE)
+const decimalDivide = (left: string, right: string) => decimalText((decimalInt(left || '0') * SCALE) / decimalInt(right || '1'))
 const pct = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
 const today = new Date()
 const iso = (date: Date) => date.toISOString().slice(0, 10)
@@ -145,15 +153,15 @@ function FirstUseDashboard({ onAdd }: { onAdd: () => void }) {
 
 function AssetCard({ asset, onManage }: { asset: Asset; onManage: () => void }) {
   const up = (asset.changePercent ?? 0) >= 0
-  const quantity = asset.lots.reduce((sum, lot) => sum + Number(lot.quantity), 0)
-  const average = quantity ? asset.lots.reduce((sum, lot) => sum + Number(lot.quantity) * Number(lot.purchasePrice), 0) / quantity : 0
+  const quantity = decimalSum(asset.lots.map((lot) => lot.quantity))
+  const average = quantity !== '0' ? decimalDivide(asset.lots.reduce((sum, lot) => decimalAdd(sum, decimalMultiply(lot.quantity, lot.purchasePrice)), '0'), quantity) : '0'
   return <article className="asset-card">
     <div className="asset-top"><div><span className="ticker">{asset.ticker}</span><span className="exchange">{asset.exchange}</span></div><span className={`chip ${asset.status === 'Owned' ? 'owned' : 'interested'}`}>{asset.status}</span></div>
     <h3>{asset.name}</h3><span className="asset-type">{asset.type}</span>
     {asset.price === null || asset.currency === null || asset.changePercent === null || asset.asOf === null || asset.priceStatus === 'unavailable'
       ? <><div className="price-line"><strong>{asset.priceStatus === 'unavailable' ? 'Price unavailable' : 'Price not refreshed'}</strong></div><span className="as-of">{asset.priceStatus === 'unavailable' ? 'The provider did not return this symbol; previous data is retained.' : 'Price data will appear after the next refresh.'}</span></>
       : <><div className="price-line"><strong>{money(asset.price, asset.currency)}</strong><span className={up ? 'positive movement' : 'negative movement'}>{up ? '↑' : '↓'} {pct(asset.changePercent)}</span></div><span className="as-of">{asset.priceStatus === 'stale' ? 'Stale price · ' : ''}As of {asset.asOf}</span></>}
-    {asset.status === 'Owned' && <div className="holding-detail"><span>{quantity} active shares</span><span>Avg. {asset.currency ? money(average, asset.currency) : 'Not available'}</span></div>}
+    {asset.status === 'Owned' && <div className="holding-detail"><span>{quantity} active shares</span><span>Avg. {asset.currency ? money(Number(average), asset.currency) : 'Not available'}</span></div>}
     <button className="card-action" onClick={onManage}>Manage {asset.status === 'Owned' ? 'lots' : 'asset'} <span>→</span></button>
   </article>
 }
@@ -189,17 +197,18 @@ function IndustryPanel({ industries, error, onSetFollowed }: { industries: Indus
 }
 
 function LotsPanel({ asset, onClose, onSaved }: { asset: Asset; onClose: () => void; onSaved: () => Promise<void> }) {
-  const [lots, setLots] = useState<Lot[]>(asset.lots); const [saving, setSaving] = useState(false); const [confirmingRemoval, setConfirmingRemoval] = useState(false); const [removeError, setRemoveError] = useState('')
+  const [lots, setLots] = useState<Lot[]>(asset.lots); const [saving, setSaving] = useState(false); const [confirmingRemoval, setConfirmingRemoval] = useState(false); const [removeError, setRemoveError] = useState(''); const [saveError, setSaveError] = useState('')
   const updateLot = (id: string, field: keyof Lot, value: string) => setLots((current) => current.map((lot) => lot.id === id ? { ...lot, [field]: value } : lot))
-  const valid = lots.every((lot) => Number(lot.quantity) > 0 && Number(lot.purchasePrice) > 0)
-  const save = async () => { if (!valid) return; setSaving(true); await mockApi.updateLots(asset.id, lots); await onSaved(); setSaving(false) }
-  const quantity = lots.reduce((sum, lot) => sum + Number(lot.quantity || 0), 0); const average = quantity ? lots.reduce((sum, lot) => sum + Number(lot.quantity || 0) * Number(lot.purchasePrice || 0), 0) / quantity : 0
+  const valid = lots.length > 0 && lots.every((lot) => /^\d+(\.\d+)?$/.test(lot.quantity) && /^\d+(\.\d+)?$/.test(lot.purchasePrice) && decimalInt(lot.quantity) > 0n && decimalInt(lot.purchasePrice) > 0n)
+  const save = async () => { if (!valid) return; setSaving(true); setSaveError(''); try { await replaceLots(asset.id, lots); await onSaved() } catch (error) { const message = error instanceof Error ? error.message : 'Unable to save lots. Your changes are still here.'; setSaveError(message); setRemoveError(message) } finally { setSaving(false) } }
+  const quantity = decimalSum(lots.map((lot) => lot.quantity || '0')); const average = quantity !== '0' ? decimalDivide(lots.reduce((sum, lot) => decimalAdd(sum, decimalMultiply(lot.quantity || '0', lot.purchasePrice || '0')), '0'), quantity) : '0'
   const remove = async () => {
     setSaving(true); setRemoveError('')
     try { await assetRemoveApi.removeAsset(asset.id); await onSaved(); onClose() }
     catch (error) { setRemoveError(error instanceof Error ? error.message : 'The asset could not be removed. Please try again.') }
     finally { setSaving(false) }
   }
+  if (asset.status !== 'Owned') return <aside className="side-panel"><button className="close-button" onClick={onClose} aria-label="Close asset management">×</button><span className="section-kicker">MANAGE ASSET</span><h2>{asset.name}</h2><p className="muted">{asset.ticker} · {asset.exchange} · {asset.type}</p><p className="panel-note">Only owned assets can have active purchase lots.</p></aside>
   return <aside className="side-panel"><button className="close-button" onClick={onClose} aria-label="Close asset management">×</button><span className="section-kicker">MANAGE ASSET</span><h2>{asset.name}</h2><p className="muted">{asset.ticker} · {asset.exchange} · {asset.type}</p>{asset.type === 'Index' ? <p className="panel-note">Indices are followed for market context and cannot be marked as owned.</p> : <><h3>Active purchase lots</h3><p className="muted">Adjust or remove lots to reflect a partial sale. Sell history is outside this MVP.</p><div className="lots">{lots.map((lot, index) => <div className="lot-row" key={lot.id}><span>Lot {index + 1}</span><label>Qty<input aria-label={`Lot ${index + 1} quantity`} value={lot.quantity} inputMode="decimal" onChange={(event) => updateLot(lot.id, 'quantity', event.target.value)} /></label><label>Price<input aria-label={`Lot ${index + 1} price`} value={lot.purchasePrice} inputMode="decimal" onChange={(event) => updateLot(lot.id, 'purchasePrice', event.target.value)} /></label><button className="icon-button" onClick={() => setLots((current) => current.filter((item) => item.id !== lot.id))} aria-label={`Remove lot ${index + 1}`}>×</button></div>)}</div><button className="text-button" onClick={() => setLots((current) => [...current, { id: crypto.randomUUID(), quantity: '', purchasePrice: '' }])}>+ Add lot</button><div className="lot-total"><span>Total quantity<strong>{quantity || '—'}</strong></span><span>Weighted average<strong>{quantity && asset.currency ? money(average, asset.currency) : '—'}</strong></span></div><button className="button primary full" disabled={!valid || saving} onClick={save}>{saving ? 'Saving…' : 'Save lots'}</button></>}<div className="remove-zone"><h3>Stop following this asset</h3><p>It will leave your watchlist. Previously stored timeline data remains in your personal archive.</p>{confirmingRemoval ? <div className="remove-confirm"><span>Remove {asset.ticker} from the watchlist?</span><button className="button danger" disabled={saving} onClick={() => void remove()}>{saving ? 'Removing…' : 'Remove asset'}</button><button className="text-button" onClick={() => { setConfirmingRemoval(false); setRemoveError('') }}>Cancel</button></div> : <button className="button danger-outline" onClick={() => { setRemoveError(''); setConfirmingRemoval(true) }}>Remove from watchlist</button>}{removeError && <p className="form-error" role="alert">{removeError}</p>}</div></aside>
 }
 
