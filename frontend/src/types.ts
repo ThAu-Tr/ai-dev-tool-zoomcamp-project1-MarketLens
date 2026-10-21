@@ -32,7 +32,7 @@ export type Article = {
   relevance: Relevance
   assets: string[]
   industries: string[]
-  snippet: string
+  snippet: string | null
   url: string
 }
 
@@ -48,6 +48,7 @@ export type Dashboard = {
   articles: Article[]
   summaries: ContextSummary[]
   lastRefreshedAt: string
+  newsStatus?: 'current' | 'stale'
 }
 
 export type Industry = { id: string; name: string; followed: boolean; suggested?: boolean; assets?: string[] }

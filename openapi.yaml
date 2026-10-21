@@ -379,7 +379,7 @@ components:
         relevance: { $ref: '#/components/schemas/Relevance' }
         assets: { type: array, items: { type: string }, example: [SAP] }
         industries: { type: array, items: { type: string }, example: [Enterprise software] }
-        snippet: { type: string, example: Analysts highlighted softer spending signals across large European software buyers. }
+        snippet: { type: [string, 'null'], example: Analysts highlighted softer spending signals across large European software buyers. }
         url: { type: string, format: uri, example: 'https://publisher.example/article' }
     ContextSummary:
       type: object
@@ -391,12 +391,16 @@ components:
         articleIds: { type: array, items: { type: string }, example: [a1] }
     Dashboard:
       type: object
-      required: [assets, articles, summaries, lastRefreshedAt]
+      required: [assets, articles, summaries, lastRefreshedAt, newsStatus]
       properties:
         assets: { type: array, items: { $ref: '#/components/schemas/Asset' } }
         articles: { type: array, items: { $ref: '#/components/schemas/Article' } }
         summaries: { type: array, items: { $ref: '#/components/schemas/ContextSummary' } }
         lastRefreshedAt: { type: string, example: '2026-10-19T17:42:00Z' }
+        newsStatus:
+          type: string
+          enum: [current, stale]
+          description: Whether direct-news retrieval completed during the latest refresh.
     Industry:
       type: object
       required: [id, name, followed]

@@ -28,6 +28,23 @@ class MarketDataResult:
             object.__setattr__(self, "unavailable_tickers", [])
 
 
+@dataclass(frozen=True)
+class NewsArticle:
+    """Metadata-only article returned by a news-provider adapter.
+
+    Identifiers must be explicit provider-supplied asset identifiers. The
+    service intentionally does not infer direct relevance from article prose.
+    """
+
+    headline: str
+    source: str
+    published_at: datetime
+    url: str
+    identifiers: list[str]
+    source_identity: str | None = None
+    snippet: str | None = None
+
+
 class ProviderGateway(Protocol):
     """Boundary for external market, news, and AI adapters.
 
@@ -37,6 +54,6 @@ class ProviderGateway(Protocol):
 
     def fetch_market_data(self, tickers: list[str], since: datetime | None) -> MarketDataResult | list[MarketQuote]: ...
 
-    def fetch_news(self) -> None: ...
+    def fetch_news(self, tickers: list[str], since: datetime | None) -> list[NewsArticle]: ...
 
     def generate_context(self) -> None: ...

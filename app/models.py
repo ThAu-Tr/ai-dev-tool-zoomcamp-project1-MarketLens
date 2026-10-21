@@ -72,7 +72,7 @@ class Article(Base):
     relevance: Mapped[str] = mapped_column(String(32))
     assets: Mapped[list[str]] = mapped_column(JSON, default=list)
     industries: Mapped[list[str]] = mapped_column(JSON, default=list)
-    snippet: Mapped[str] = mapped_column(Text)
+    snippet: Mapped[str | None] = mapped_column(Text, nullable=True)
     url: Mapped[str] = mapped_column(String(2048))
 
 
@@ -93,3 +93,4 @@ class RefreshState(Base):
     last_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="never")
     unavailable_tickers: Mapped[list[str]] = mapped_column(JSON, default=list)
+    news_status: Mapped[str] = mapped_column(String(16), default="current")

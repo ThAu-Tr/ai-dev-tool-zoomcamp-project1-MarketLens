@@ -142,6 +142,17 @@ describe('dashboard', () => {
     expect(getDashboard).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps stored direct news visible and labels it stale when refresh news is unavailable', async () => {
+    getDashboard.mockResolvedValue({ ...populatedDashboard, newsStatus: 'stale', articles: [{ ...populatedDashboard.articles[0], snippet: null }] })
+
+    render(<App />)
+
+    expect(await screen.findByRole('status')).toHaveTextContent('News could not be fully refreshed')
+    expect(screen.getByText('SAP update')).toBeInTheDocument()
+    expect(screen.queryByText('Stored article.')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /SAP update/i })).toHaveAttribute('href', 'https://example.test/sap')
+  })
+
   it('renders a first-use state when the stored dashboard has no assets', async () => {
     getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
 

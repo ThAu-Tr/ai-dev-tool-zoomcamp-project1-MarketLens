@@ -64,7 +64,7 @@ class ArticleResponse(ApiModel):
     relevance: Literal["Direct asset news", "Industry news", "Market context"]
     assets: list[str]
     industries: list[str]
-    snippet: str
+    snippet: str | None
     url: str
 
 
@@ -81,6 +81,7 @@ class DashboardResponse(ApiModel):
     articles: list[ArticleResponse]
     summaries: list[ContextSummaryResponse]
     lastRefreshedAt: str
+    newsStatus: Literal["current", "stale"] = "current"
 
 
 class RefreshResponse(ApiModel):

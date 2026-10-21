@@ -134,6 +134,7 @@ function DashboardView({ dashboard, refreshing, onRefresh, onManage, onAdd }: { 
     <section className="context-layout">
       <div className="feed-column">
         <div className="section-head"><div><span className="section-kicker">RELEVANT SIGNALS</span><h2>What happened around it</h2></div></div>
+        {dashboard.newsStatus === 'stale' && <p className="empty-copy" role="status">News could not be fully refreshed. Previously stored news is shown.</p>}
         {groups.map((group) => <NewsGroup key={group.relevance} {...group} articles={dashboard.articles.filter((article) => article.relevance === group.relevance)} />)}
       </div>
       <aside className="insight-column">
@@ -173,7 +174,7 @@ function NewsGroup({ title, description, articles }: { title: string; descriptio
 }
 
 function ArticleCard({ article }: { article: Dashboard['articles'][number] }) {
-  return <a className="article-card" href={article.url} target="_blank" rel="noreferrer"><div><div className="article-meta"><span className={`dot ${article.relevance === 'Direct asset news' ? 'blue' : article.relevance === 'Industry news' ? 'amber' : 'violet'}`} />{article.source}<span>·</span>{article.publishedAt}</div><h4>{article.headline}</h4><p>{article.snippet}</p><div className="article-tags">{[...article.assets, ...article.industries].map((tag) => <span key={tag}>{tag}</span>)}</div></div><span className="external">↗</span></a>
+  return <a className="article-card" href={article.url} target="_blank" rel="noreferrer"><div><div className="article-meta"><span className={`dot ${article.relevance === 'Direct asset news' ? 'blue' : article.relevance === 'Industry news' ? 'amber' : 'violet'}`} />{article.source}<span>·</span>{article.publishedAt}</div><h4>{article.headline}</h4>{article.snippet && <p>{article.snippet}</p>}<div className="article-tags">{[...article.assets, ...article.industries].map((tag) => <span key={tag}>{tag}</span>)}</div></div><span className="external">↗</span></a>
 }
 
 function WatchlistView({ assets, industries, industryError, initialAsset, onSelect, onAdd, onChanged, onSetIndustryFollowed }: { assets: Asset[]; industries: Industry[]; industryError: string; initialAsset: Asset | null; onSelect: (asset: Asset) => void; onAdd: () => void; onChanged: () => Promise<void>; onSetIndustryFollowed: (id: string, followed: boolean) => Promise<void> }) {
