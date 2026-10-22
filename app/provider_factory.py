@@ -24,8 +24,8 @@ class ProviderGatewayComposition:
     def fetch_historical_data(self, tickers, market_date):
         return self.market_provider.fetch_historical_data(tickers, market_date)
 
-    def fetch_news(self, tickers, since):
-        return self.news_provider.fetch_news(tickers, since)
+    def fetch_news(self, tickers, since, industries=None):
+        return self.news_provider.fetch_news(tickers, since, industries)
 
     def generate_context(self) -> None:
         return None
