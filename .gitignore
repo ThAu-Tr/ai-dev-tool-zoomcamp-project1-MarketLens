@@ -23,3 +23,5 @@ vite.config.d.ts
 .vscode/
 
 _archived/
+test_api_keys.py
+check_marketlens_providers.py
