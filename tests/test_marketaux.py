@@ -72,11 +72,13 @@ def test_marketaux_uses_entity_symbols_only_for_requested_assets(monkeypatch: py
 
 
 def test_marketaux_skips_request_without_credentials_or_symbols(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MARKETAUX_API_KEY", raising=False)
+
     def fail(*args, **kwargs):
         raise AssertionError("request should not be made")
 
     monkeypatch.setattr("app.adapters.marketaux.urlopen", fail)
-    assert MarketauxProvider(api_key=None).fetch_news(["SAP"], None) == []
+    assert MarketauxProvider().fetch_news(["SAP"], None) == []
     assert MarketauxProvider(api_key="key").fetch_news([], None) == []
 
 
