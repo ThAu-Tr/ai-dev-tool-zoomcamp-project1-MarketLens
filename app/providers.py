@@ -43,6 +43,7 @@ class NewsArticle:
     identifiers: list[str]
     source_identity: str | None = None
     snippet: str | None = None
+    industry_identifiers: list[str] | None = None
 
 
 class ProviderGateway(Protocol):

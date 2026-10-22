@@ -130,3 +130,19 @@ def test_refresh_does_not_infer_industry_relevance_from_unfollowed_or_uncertain_
     assert response.status_code == 200
     with session_factory() as session:
         assert session.query(Article).count() == 0
+
+
+def test_refresh_uses_explicit_marketaux_industry_metadata_for_followed_industries(session_factory):
+    seed_assets(session_factory)
+    with session_factory.begin() as session:
+        session.add_all([Industry(id="software", name="Enterprise software"), IndustryFollow(user_id=1, industry_id="software")])
+    article = NewsArticle(
+        headline="Quarterly outlook", source="Wire", published_at=datetime(2026, 10, 21, 9, tzinfo=UTC),
+        url="https://news.example/software", identifiers=[], industry_identifiers=["Enterprise software"],
+    )
+    response = build_client(session_factory, FakeNewsProvider([article])).post("/api/refresh")
+    assert response.status_code == 200
+    with session_factory() as session:
+        saved = session.query(Article).one()
+        assert saved.relevance == "Industry news"
+        assert saved.industries == ["software"]

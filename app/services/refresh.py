@@ -160,9 +160,10 @@ def _matched_industries(article: NewsArticle, industries: list[object]) -> list[
     "AI" inside "said"). Uncertain articles are left unclassified.
     """
     text = f"{article.headline} {article.snippet or ''}".casefold()
+    supplied_industries = {value.strip().casefold() for value in (article.industry_identifiers or []) if value.strip()}
     matched: list[str] = []
     for industry in industries:
         name = industry.name.strip()
-        if name and re.search(rf"(?<!\w){re.escape(name.casefold())}(?!\w)", text):
+        if name and (name.casefold() in supplied_industries or re.search(rf"(?<!\w){re.escape(name.casefold())}(?!\w)", text)):
             matched.append(industry.id)
     return sorted(set(matched))
