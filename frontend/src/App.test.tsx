@@ -9,7 +9,7 @@ import { assetRemoveApi } from './api/assetRemoveApi'
 import { replaceLots } from './api/lotsApi'
 import { updateAsset } from './api/assetUpdateApi'
 import { timelineApi } from './api/timelineApi'
-import type { Dashboard } from './types'
+import type { Dashboard, TimelineDay } from './types'
 
 vi.mock('./api/dashboardApi', () => ({
   dashboardApi: { getDashboard: vi.fn() },
@@ -56,18 +56,30 @@ describe('dashboard', () => {
 
   it('loads the selected historical date through the timeline API and exposes retryable errors', async () => {
     getDashboard.mockResolvedValue(populatedDashboard)
-    getTimelineDay.mockResolvedValue({ date: '2026-10-21', source: 'newly-loaded', assets: [{ ...populatedDashboard.assets[0], price: 201.25, changePercent: -1.2 }], articles: [], summaries: [] })
+    let finishInitialLoad!: (day: TimelineDay) => void
+    getTimelineDay.mockImplementationOnce(() => new Promise<TimelineDay>((resolve) => { finishInitialLoad = resolve }))
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: 'Timeline' }))
     await waitFor(() => expect(getTimelineDay).toHaveBeenCalled())
+    expect(screen.getByText(/Loading and saving this day’s prices/)).toBeInTheDocument()
+    finishInitialLoad({ date: '2026-10-21', source: 'newly-loaded', assets: [{ ...populatedDashboard.assets[0], price: 201.25, changePercent: -1.2 }], articles: [], summaries: [] })
     expect(await screen.findByText('Newly retrieved')).toBeInTheDocument()
     expect(screen.getByText('201.25 EUR')).toBeInTheDocument()
+
+    getTimelineDay.mockResolvedValueOnce({ date: '2026-10-20', source: 'archive', marketClosed: true, assets: [], articles: [], summaries: [] })
+    const initialRequestDate = getTimelineDay.mock.calls[0][0]
+    fireEvent.click(screen.getAllByRole('button', { name: /Load/ })[1])
+    await waitFor(() => expect(getTimelineDay).toHaveBeenCalledTimes(2))
+    expect(getTimelineDay.mock.calls[1][0]).not.toEqual(initialRequestDate)
+    expect(await screen.findByText('Loaded from archive')).toBeInTheDocument()
+    expect(screen.getByText('No market-day data')).toBeInTheDocument()
+
     getTimelineDay.mockRejectedValueOnce(new Error('Historical market data is currently unavailable.'))
     fireEvent.click(screen.getAllByRole('button', { name: /Load/ })[0])
-    expect(await screen.findByText('Could not load this date')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('Historical market data is currently unavailable.')
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    await waitFor(() => expect(getTimelineDay).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(getTimelineDay).toHaveBeenCalledTimes(4))
   })
 
   it('separates followed and available industries, and moves an industry after a successful save', async () => {
