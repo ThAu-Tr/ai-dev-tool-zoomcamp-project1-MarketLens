@@ -156,12 +156,14 @@ All environment-specific values are supplied through environment variables. Secr
 | Concern | Development | Test | Production |
 | --- | --- | --- | --- |
 | Database | Local PostgreSQL, normally Docker | Separate disposable PostgreSQL database | Managed PostgreSQL with backups |
-| External providers | Real keys only for controlled manual checks | Fake adapters and fixtures; no network calls | Real keys from deployment secrets |
+| External providers | Reviewer/developer supplies own EODHD and Marketaux keys locally | Fake adapters and fixtures; no network calls | Deployment secrets if provider-backed data is enabled; no keys bundled with the app |
 | AI | Controlled manual checks | Deterministic fake responses | Real API with bounded inputs and error handling |
 | Logging | Verbose local logs | Test-runner logs | Structured operational logs |
 | Debug | Enabled | Disabled | Disabled |
 | CORS | Vite development origin | Usually not applicable | Only deployed frontend origin(s) |
 | Demo data | Optional seed data | Test fixtures | Optional public-demo seed only |
+
+For this non-commercial course assignment, peer reviewers running the application locally create their own provider accounts, copy `.env.example` to an ignored `.env`, and supply their own keys. The repository distributes no credentials. A public demo must not assume these personal API keys authorize redistribution of provider data.
 
 Core configuration includes `APP_ENV`, `DATABASE_URL`, `CORS_ORIGINS`, provider API keys, `OPENAI_API_KEY`, `LOG_LEVEL`, and conservative refresh limits. A `DEMO_MODE` flag may seed sample content locally without changing normal product behavior.
 
