@@ -112,7 +112,7 @@ uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
-To manually smoke-check Marketaux after provider composition is enabled, configure `MARKETAUX_API_KEY` in the backend environment and run one dashboard refresh with one or more tracked symbols. Confirm the refresh completes, then inspect `GET /api/dashboard` for metadata-only articles and source links. The adapter sends at most three results per request and only requests tracked symbols; this live check is optional and must use your own account and quota. Automated tests mock HTTP and do not call Marketaux.
+To manually smoke-check Marketaux after provider composition is enabled, configure `MARKETAUX_API_KEY` in the backend environment and run one dashboard refresh with one or more tracked symbols. Confirm the refresh completes, then inspect `GET /api/dashboard` for metadata-only articles and source links. The adapter makes separate bounded queries for tracked symbols and followed industries (at most two requests, with three results per request); this live check is optional and must use your own account and quota. Automated tests mock HTTP and do not call Marketaux.
 
 ### EODHD smoke check (manual, uses your account)
 
