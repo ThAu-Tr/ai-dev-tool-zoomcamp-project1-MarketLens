@@ -42,7 +42,11 @@ class TimelineService:
         except Exception as error:
             raise HistoricalProviderError("Historical market data is currently unavailable. Please try again.") from error
         if isinstance(result, MarketDataResult):
-            if result.unavailable_tickers:
+            # Partial provider coverage is useful historical data: persist the
+            # returned observations and leave uncovered assets unavailable.
+            # With no observations at all, an unavailable ticker list signals
+            # a provider failure rather than a confirmed empty market day.
+            if result.unavailable_tickers and not result.quotes:
                 raise HistoricalProviderError("Historical market data is incomplete. No day was saved; please try again.")
             quotes, market_closed = result.quotes, result.market_closed
         else:

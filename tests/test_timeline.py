@@ -79,3 +79,32 @@ def test_empty_market_day_is_archived_but_provider_failure_is_not():
     assert response.status_code == 502
     with factory() as session:
         assert session.get(HistoricalDay, (1, date(2026, 10, 18))) is None
+
+
+def test_partial_provider_coverage_saves_available_assets_and_marks_others_unavailable():
+    factory = make_factory()
+    provider = HistoryProvider(MarketDataResult(
+        [MarketQuote("SAP", Decimal("112.50"), "EUR", Decimal("1.2"), datetime(2026, 10, 20, 16, tzinfo=UTC))],
+        unavailable_tickers=["MSFT"],
+    ))
+    response = build_client(factory, provider).get("/api/timeline?date=2026-10-20")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "newly-loaded"
+    assert body["marketClosed"] is False
+    assets = {asset["ticker"]: asset for asset in body["assets"]}
+    assert assets["SAP"]["price"] == 112.5
+    assert assets["MSFT"]["price"] is None
+    with factory() as session:
+        saved = {row.ticker: row for row in session.scalars(select(HistoricalPrice))}
+        assert saved["SAP"].price == Decimal("112.500000")
+        assert saved["MSFT"].price is None
+
+
+def test_no_observations_with_provider_failures_do_not_save_a_day():
+    factory = make_factory()
+    provider = HistoryProvider(MarketDataResult([], unavailable_tickers=["SAP", "MSFT"]))
+    response = build_client(factory, provider).get("/api/timeline?date=2026-10-20")
+    assert response.status_code == 502
+    with factory() as session:
+        assert session.scalar(select(HistoricalDay)) is None
