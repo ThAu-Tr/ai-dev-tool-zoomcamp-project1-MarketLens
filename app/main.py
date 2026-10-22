@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.providers import ProviderGateway
+from app.provider_factory import create_default_provider_gateway
 from app.repositories.catalogue import AssetCatalogueRepository
 from app.repositories.dashboard import DashboardRepository
 from app.repositories.assets import AssetRepository
@@ -26,6 +27,8 @@ from app.schemas import TimelineDayResponse
 
 
 def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
+    if provider_gateway is None:
+        provider_gateway = create_default_provider_gateway()
     app = FastAPI(title="MarketLens API", openapi_url=None)
 
     @app.get("/api/dashboard", response_model=DashboardResponse)

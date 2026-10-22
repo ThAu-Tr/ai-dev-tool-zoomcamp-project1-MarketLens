@@ -104,14 +104,19 @@ The current backend suite covers the completed dashboard, catalogue-search, and 
 **Course assignment / peer review:** MarketLens is a non-commercial educational project. Reviewers who run the app locally create their own EODHD and Marketaux accounts and supply their own API keys in a local `.env` file (copy variable names from `.env.example`). API keys are never included in the repository, and the frontend must not expose them. Provider usage is subject to each reviewer's own account limits and terms.
 
 
-The backend requires `DATABASE_URL`; it is intentionally not hard-coded. Alembic reads the same variable when applying migrations. The optional `MARKETAUX_API_KEY` is read by the backend only. `MARKETAUX_USER_AGENT` can override the request User-Agent if a local network or provider requires a different value.
+The backend reads `DATABASE_URL`, `EODHD_API_KEY`, and optional `MARKETAUX_API_KEY` from the process environment. For local use, copy `.env.example` to the ignored `.env` file and add your own keys there; a local `.env` is loaded without overriding variables supplied by the deployment environment. `MARKETAUX_USER_AGENT` can override the request User-Agent. Alembic reads `DATABASE_URL` when applying migrations.
 
 ```powershell
 $env:DATABASE_URL = "postgresql+psycopg://USER:PASSWORD@HOST:5432/DATABASE"
 uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
 ```
 
 To manually smoke-check Marketaux after provider composition is enabled, configure `MARKETAUX_API_KEY` in the backend environment and run one dashboard refresh with one or more tracked symbols. Confirm the refresh completes, then inspect `GET /api/dashboard` for metadata-only articles and source links. The adapter sends at most three results per request and only requests tracked symbols; this live check is optional and must use your own account and quota. Automated tests mock HTTP and do not call Marketaux.
+
+### EODHD smoke check (manual, uses your account)
+
+After migrations, start the backend with `EODHD_API_KEY` set and request `POST /api/refresh` once. Confirm the response succeeds and `GET /api/dashboard` shows an `asOf` timestamp and currency supplied by the provider. Then request `GET /api/timeline?date=YYYY-MM-DD` for one eligible date with known EODHD coverage and confirm its `source` is `newly-loaded`; request the same date again and confirm `source` is `archive`. The second request should not call EODHD. Each refresh may try the intraday endpoint and then fall back to daily closes; use one tracked asset and avoid repeated retries to stay within the free account's daily request limit. Adapter tests mock HTTP and never consume API calls.
 
 The frontend uses `VITE_API_BASE_URL` when it needs a non-default API origin. Provider credentials are not used by the currently completed features and must never be exposed to the browser.
 
