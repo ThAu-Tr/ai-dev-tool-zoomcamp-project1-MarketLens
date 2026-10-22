@@ -294,14 +294,17 @@ Instead, historical data is loaded lazily.
 
 ### Lazy historical loading
 
+For the MVP, the timeline focuses on historical price movements.
+
 When the user opens a historical day for the first time:
 
-1. fetch market data for that day
-2. fetch relevant news for that day
-3. classify and link the news
-4. save the resulting metadata in the database
+1. Fetch available market prices for that day.
+2. Display the historical price movements.
+3. Save the retrieved data in the database.
 
-If the user opens the same day again, the app loads it from the database instead of querying the APIs again.
+Previously loaded dates reuse their stored price data without making additional provider requests.
+
+Historical news, AI-generated context, and the complete archived-day experience are deferred to post-MVP (#15 and #16).
 
 ### Growing timeline
 
@@ -475,18 +478,14 @@ Bond ETFs remain supported because they behave like normal exchange-traded funds
 6. Dashboard updates price movements and relevant news.
 7. AI context summaries explain possible relationships.
 
+
 ### Historical Use
 
 1. User opens the timeline/calendar.
 2. User chooses a date within the available historical window.
-3. If the date has already been fetched:
-   - load it from the database.
-4. If the date has not been fetched:
-   - fetch market data for that date
-   - fetch relevant news
-   - classify and link the results
-   - save them
-5. User sees the day's market movements, articles, and AI-generated context.
+3. If the date is already stored, load the saved price data.
+4. Otherwise, retrieve and persist the available historical prices.
+5. User sees the day's historical price movements.
 
 ---
 
@@ -582,6 +581,13 @@ The final provider choices should be checked for:
 ---
 
 ## 21. Explicitly Out of Scope for MVP
+
+### Historical Timeline (Post-MVP)
+
+- Retrieve and classify historical news for selected dates (#15).
+- Link historical articles to relevant assets and industries (#15).
+- Include AI-generated context in historical day views (#15).
+- Provide a complete archived-day view combining stored prices, categorized news, and AI context without additional provider calls (#16).
 
 ### Asset classes
 
@@ -685,12 +691,12 @@ The MVP has five core features.
 - broader market context
 - manual refresh
 
-### 4. Persistent Historical Market Timeline
+### 4. Historical Market Timeline
 
 - select individual historical days
-- lazy-load price/news data for that day
-- store retrieved metadata
-- revisit already loaded historical days without additional API calls
+- lazily load historical price movements
+- persist retrieved price data
+- reuse stored price data without additional provider calls
 
 ### 5. AI Market Context
 

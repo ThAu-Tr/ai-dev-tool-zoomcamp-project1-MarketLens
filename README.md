@@ -37,9 +37,10 @@ The planned MVP lets a single demo user:
 3. Follow industries and review suggested industries based on tracked assets.
 4. Refresh stored prices and categorized news context.
 5. Read uncertainty-aware, source-linked AI context summaries.
-6. Load and revisit individual historical market days within the initial 30-day request window.
+6. Load historical price movements for individual days within the initial 30-day request window and reuse stored results.
 
 The product deliberately excludes trading, broker integrations, authentication, real-time alerts, full portfolio accounting, crypto, and investment recommendations. Read the complete [product specification](_docs/plan.md).
+Historical news, AI-generated historical context, and the complete archived-day experience are planned as post-MVP extensions (#15 and #16).
 
 ## Architecture
 

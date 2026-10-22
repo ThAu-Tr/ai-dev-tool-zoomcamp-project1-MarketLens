@@ -20,6 +20,19 @@ Usage percentages reflect the reported share of the five-hour Codex allowance fo
 
 ---
 
+## Codex Model & Usage Comparison
+
+| Issues | Model | Reasoning effort | 5-hour usage | Notes |
+| --- | --- | --- | --- | --- |
+| #6, #7 | Terra | Medium | 86% | Combined session; included PM, engineering, and QA |
+| #8 | Luna | Medium | 8% | Engineering and QA |
+| #5, #9 | Luna | Medium | 25% | Combined parallel implementation; engineering and QA |
+| #4 | Terra | Medium | 10% | Additional session to complete #4; both #4 and #10 now closed |
+
+Usage percentages reflect the reported share of the five-hour Codex allowance for each session, **not per-issue costs or measured token counts**. Tasks differed in complexity, and the Terra session also included PM work, so the figures are not a controlled model benchmark.
+
+---
+
 ## Example Template
 
 ### Task / Issue

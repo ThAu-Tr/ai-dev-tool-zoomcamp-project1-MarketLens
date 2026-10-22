@@ -58,6 +58,8 @@ Description: Use the existing stored price and article context to produce bounde
 Goal: Let a user open a previous market day and see its stored or newly retrieved price movement.
 Description: Implement `GET /api/timeline?date=YYYY-MM-DD` so a first visit within the preceding 30 days lazily loads and stores the selected day's price information, while a later visit reuses the saved snapshot. Reject an unarchived date outside that initial window. The timeline must distinguish a normal result from a market-closed or provider-unavailable date.
 
+# Post-MVP Backlog
+
 ## 15. Add relevant news and context to a historical day
 Goal: Let a historical day explain the news context available for that date.
 Description: For a selected historical day, retrieve or reuse relevant articles, classify them into the same asset, industry, and market categories, and persist the resulting context with that day's snapshot. Show only supported evidence and label incomplete context when a source or classification is unavailable.

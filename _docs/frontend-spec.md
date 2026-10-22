@@ -211,13 +211,12 @@ If the selected day is not stored, explain that MarketLens will retrieve and sav
 
 For the selected date, show:
 
-- selected date and whether data was loaded from the archive or newly retrieved;
-- price movement for followed assets that have data for that market day;
-- relevant direct asset, industry, and broader-context article groups;
-- linked industries where relevant; and
-- available AI context cards plus the disclaimer.
+- the selected date;
+- whether data was loaded from storage or newly retrieved;
+- historical price movements for followed assets;
+- a clear state when market data is unavailable.
 
-The day view must make it clear that publication time and the relevant market trading date can differ. It must not imply that an article definitely caused a movement.
+Historical news, industry context, and AI-generated explanations are reserved for post-MVP (#15 and #16).
 
 ## 6. API-facing frontend contract
 

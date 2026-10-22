@@ -144,7 +144,7 @@ GET /api/timeline?date=...
 Is that day already loaded?
   | yes                         | no
   v                             v
-Read stored timeline       Fetch, classify, persist, return
+Read stored timeline       Fetch historical prices, persist, return
 ```
 
 The loaded-day record prevents unnecessary repeat provider requests. Historical data already retrieved remains in the personal archive after the initial 30-day request window.
