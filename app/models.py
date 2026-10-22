@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, JSON, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, JSON, Numeric, String, Text, UniqueConstraint, Boolean, Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -94,3 +94,29 @@ class RefreshState(Base):
     status: Mapped[str] = mapped_column(String(16), default="never")
     unavailable_tickers: Mapped[list[str]] = mapped_column(JSON, default=list)
     news_status: Mapped[str] = mapped_column(String(16), default="current")
+
+
+class HistoricalDay(Base):
+    __tablename__ = "historical_days"
+    user_id: Mapped[int] = mapped_column(ForeignKey("demo_users.id"), primary_key=True)
+    market_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    market_closed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class HistoricalPrice(Base):
+    __tablename__ = "historical_prices"
+    id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("demo_users.id"), index=True)
+    market_date: Mapped[date] = mapped_column(Date, index=True)
+    asset_id: Mapped[str] = mapped_column(String(80))
+    ticker: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(255))
+    exchange: Mapped[str] = mapped_column(String(120))
+    asset_type: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(16))
+    price: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    change_percent: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
+    as_of: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    industries: Mapped[list[str]] = mapped_column(JSON, default=list)
+    __table_args__ = (UniqueConstraint("user_id", "market_date", "asset_id", name="uq_historical_price_day_asset"),)

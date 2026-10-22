@@ -97,6 +97,15 @@ class RefreshResponse(ApiModel):
     lastRefreshedAt: datetime
 
 
+class TimelineDayResponse(ApiModel):
+    date: date
+    source: Literal["archive", "newly-loaded"]
+    marketClosed: bool = False
+    assets: list[AssetResponse]
+    articles: list[ArticleResponse] = []
+    summaries: list[ContextSummaryResponse] = []
+
+
 class AssetSearchResult(ApiModel):
     name: str
     ticker: str

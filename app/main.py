@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Annotated
+from datetime import date
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from sqlalchemy.orm import Session
@@ -19,6 +20,9 @@ from app.services.dashboard import DashboardService
 from app.services.industries import IndustryService
 from app.repositories.refresh import RefreshRepository
 from app.services.refresh import ProviderUnavailableError, RefreshService
+from app.repositories.timeline import TimelineRepository
+from app.services.timeline import HistoricalDateOutOfRange, HistoricalProviderError, TimelineService
+from app.schemas import TimelineDayResponse
 
 
 def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
@@ -28,6 +32,19 @@ def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
     def get_dashboard(session: Session = Depends(get_session)) -> DashboardResponse:
         try:
             return DashboardService(DashboardRepository(session), provider_gateway).read_dashboard()
+        except RuntimeError as error:
+            raise HTTPException(status_code=500, detail=str(error)) from error
+
+    @app.get("/api/timeline", response_model=TimelineDayResponse)
+    def get_timeline(date: Annotated[date, Query(description="Requested market day in YYYY-MM-DD format")], session: Session = Depends(get_session)) -> TimelineDayResponse:
+        try:
+            return TimelineService(TimelineRepository(session), provider_gateway).get_day(date)
+        except HistoricalDateOutOfRange as error:
+            raise HTTPException(status_code=403, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except HistoricalProviderError as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
         except RuntimeError as error:
             raise HTTPException(status_code=500, detail=str(error)) from error
 

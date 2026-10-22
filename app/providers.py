@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Protocol
 
@@ -53,6 +53,8 @@ class ProviderGateway(Protocol):
     """
 
     def fetch_market_data(self, tickers: list[str], since: datetime | None) -> MarketDataResult | list[MarketQuote]: ...
+
+    def fetch_historical_data(self, tickers: list[str], market_date: date) -> MarketDataResult | list[MarketQuote]: ...
 
     def fetch_news(self, tickers: list[str], since: datetime | None) -> list[NewsArticle]: ...
 

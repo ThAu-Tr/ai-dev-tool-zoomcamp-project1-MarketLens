@@ -250,7 +250,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/TimelineDay'
         '400':
+          description: The requested date is in the future.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
           description: Date is outside the allowed initial history window and has not been archived.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: The date query is missing or is not a valid YYYY-MM-DD date.
           content:
             application/json:
               schema:
