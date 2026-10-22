@@ -569,14 +569,9 @@ A provider may fail temporarily or not support a specific asset.
 
 The implementation should avoid assuming perfect coverage.
 
-### Data licensing / terms of use
+### Provider use in the course assignment
 
-The final provider choices should be checked for:
-
-- permitted display of market data
-- permitted storage of metadata
-- permitted display of news snippets
-- attribution requirements
+MarketLens is a non-commercial educational course project, not a commercial market-data product. Peer reviewers running the app locally use their **own** EODHD and Marketaux accounts and API keys; no keys are distributed with the repository. The selected providers are EODHD (market prices and daily history) and Marketaux (financial news). Provider-specific usage limits, attribution, and terms still apply to each account. Publicly accessible deployment does not automatically grant permission to redistribute provider data; do not assume otherwise.
 
 ---
 
