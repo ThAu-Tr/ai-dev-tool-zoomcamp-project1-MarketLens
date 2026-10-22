@@ -14,8 +14,8 @@ class FakeMarketProvider:
 
 
 class FakeNewsProvider:
-    def fetch_news(self, tickers, since):
-        return ("news", tickers, since)
+    def fetch_news(self, tickers, since, industries=None):
+        return ("news", tickers, since, industries)
 
 
 def test_composition_routes_each_gateway_call_to_the_matching_provider():
@@ -27,7 +27,7 @@ def test_composition_routes_each_gateway_call_to_the_matching_provider():
 
     assert gateway.fetch_market_data(["SAP"], since) == ("current", ["SAP"], since)
     assert gateway.fetch_historical_data(["SAP"], day) == ("historical", ["SAP"], day)
-    assert gateway.fetch_news(["SAP"], since) == ("news", ["SAP"], since)
+    assert gateway.fetch_news(["SAP"], since, ["Software"]) == ("news", ["SAP"], since, ["Software"])
 
 
 def test_default_factory_composes_both_adapters_when_both_credentials_exist(monkeypatch):

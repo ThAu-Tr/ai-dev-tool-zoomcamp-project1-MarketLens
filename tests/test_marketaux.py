@@ -27,10 +27,10 @@ def test_marketaux_normalizes_metadata_limits_and_maps_symbols_and_industries(mo
     captured: dict[str, object] = {}
 
     def fake_urlopen(request, timeout):
-        captured["request"] = request
+        captured.setdefault("requests", []).append(request)
         captured["timeout"] = timeout
         return FakeResponse({"data": [
-            {"uuid": "article-1", "title": "SAP quarterly update", "source": "Example News", "published_at": "2026-10-21T10:30:00Z", "url": "https://news.example/1", "snippet": "Supplied summary.", "entities": [{"symbol": "SAP", "name": "SAP SE", "type": "equity"}, {"name": "Enterprise software", "type": "industry"}]},
+            {"uuid": "article-1", "title": "SAP quarterly update", "source": "Example News", "published_at": "2026-10-21T10:30:00Z", "url": "https://news.example/1", "snippet": "Supplied summary.", "entities": [{"symbol": "SAP", "name": "SAP SE", "type": "equity", "industry": "Technology"}, {"name": "Enterprise software", "type": "industry"}]},
             {"id": "article-2", "headline": "ASML outlook", "source": "Wire", "published_at": "2026-10-21T11:00:00+00:00", "url": "https://news.example/2", "entities": [{"symbol": "ASML", "type": "equity"}]},
             {"title": "third", "source": "Wire", "published_at": "2026-10-21T12:00:00Z", "url": "https://news.example/3"},
             {"title": "fourth is trimmed", "source": "Wire", "published_at": "2026-10-21T13:00:00Z", "url": "https://news.example/4"},
@@ -40,21 +40,27 @@ def test_marketaux_normalizes_metadata_limits_and_maps_symbols_and_industries(mo
     monkeypatch.setattr("app.adapters.marketaux.urlopen", fake_urlopen)
     provider = MarketauxProvider(api_key="secret", user_agent="TestClient/1.0")
     since = datetime(2026, 10, 20, 9, tzinfo=UTC)
-    articles = provider.fetch_news(["sap", "SAP", "ASML"], since)
+    articles = provider.fetch_news(["sap", "SAP", "ASML"], since, ["Enterprise software", "Semiconductors"])
 
     assert len(articles) == 3
     assert articles[0].headline == "SAP quarterly update"
     assert articles[0].published_at == datetime(2026, 10, 21, 10, 30, tzinfo=UTC)
     assert articles[0].identifiers == ["SAP"]
-    assert articles[0].industry_identifiers == ["Enterprise software"]
+    assert articles[0].industry_identifiers == ["Technology", "Enterprise software"]
     assert articles[0].source_identity == "article-1"
     assert articles[0].snippet == "Supplied summary."
-    request = captured["request"]
-    params = parse_qs(urlparse(request.full_url).query)
-    assert params["symbols"] == ["SAP,ASML"]
-    assert params["limit"] == ["3"]
-    assert params["published_after"] == ["2026-10-20T09:00:00Z"]
-    assert request.get_header("User-agent") == "TestClient/1.0"
+    requests = captured["requests"]
+    assert len(requests) == 2
+    symbol_params = parse_qs(urlparse(requests[0].full_url).query)
+    industry_params = parse_qs(urlparse(requests[1].full_url).query)
+    assert symbol_params["symbols"] == ["SAP,ASML"]
+    assert "industries" not in symbol_params
+    assert industry_params["industries"] == ["Technology"]
+    assert "symbols" not in industry_params
+    for params in (symbol_params, industry_params):
+        assert params["limit"] == ["3"]
+        assert params["published_after"] == ["2026-10-20T09:00:00Z"]
+    assert requests[0].get_header("User-agent") == "TestClient/1.0"
 
 
 def test_marketaux_uses_entity_symbols_only_for_requested_assets(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -98,3 +104,52 @@ def test_marketaux_empty_page_does_not_retry(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr("app.adapters.marketaux.urlopen", empty)
     assert MarketauxProvider(api_key="key").fetch_news(["SAP"], None) == []
     assert calls == 1
+
+
+def test_marketaux_includes_supported_parent_industries_with_symbols(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = []
+
+    def empty(request, timeout):
+        captured.append(parse_qs(urlparse(request.full_url).query))
+        return FakeResponse({"data": []})
+
+    monkeypatch.setattr("app.adapters.marketaux.urlopen", empty)
+    MarketauxProvider(api_key="key").fetch_news(["SAP"], None, ["Enterprise software", "Semiconductors", "Banking", "Unknown taxonomy"])
+    assert captured[0]["symbols"] == ["SAP"]
+    assert "industries" not in captured[0]
+    assert "symbols" not in captured[1]
+    assert captured[1]["industries"] == ["Technology,Financial Services"]
+
+
+def test_marketaux_can_request_followed_industry_context_without_symbols(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = []
+
+    def empty(request, timeout):
+        captured.append(parse_qs(urlparse(request.full_url).query))
+        return FakeResponse({"data": []})
+
+    monkeypatch.setattr("app.adapters.marketaux.urlopen", empty)
+    MarketauxProvider(api_key="key").fetch_news([], None, ["Renewable energy"])
+    assert "symbols" not in captured[0]
+    assert captured[0]["industries"] == ["Energy"]
+
+
+def test_marketaux_returns_industry_only_articles_from_separate_query(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    def responses(request, timeout):
+        nonlocal calls
+        calls += 1
+        payload = {"data": []} if calls == 1 else {"data": [
+            {"uuid": "industry-only", "title": "Software market update", "source": "Wire",
+             "published_at": "2026-10-21T10:00:00Z", "url": "https://news.example/industry-only",
+             "entities": [{"symbol": "MSFT", "type": "equity", "industry": "Technology"}]},
+        ]}
+        return FakeResponse(payload)
+
+    monkeypatch.setattr("app.adapters.marketaux.urlopen", responses)
+    articles = MarketauxProvider(api_key="key").fetch_news(["SAP"], None, ["Enterprise software"])
+    assert calls == 2
+    assert len(articles) == 1
+    assert articles[0].identifiers == []
+    assert articles[0].industry_identifiers == ["Technology"]

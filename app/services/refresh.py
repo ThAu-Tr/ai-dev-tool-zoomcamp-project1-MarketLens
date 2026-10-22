@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 import re
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -93,16 +93,23 @@ class RefreshService:
         fetch_news = getattr(self.provider, "fetch_news", None)
         if not callable(fetch_news):
             return
-        since = self.repository.newest_article_at(user_id)
+        since = max(
+            (value for value in (self.repository.newest_article_at(user_id), self.repository.news_checked_at(user_id)) if value is not None),
+            key=_as_utc,
+            default=None,
+        )
+        industries = self.repository.followed_industries(user_id)
+        # Keep a one-second overlap because Marketaux's published_after filter
+        # is strict and its supported timestamp precision includes whole seconds.
+        query_started_at = datetime.now(UTC).replace(microsecond=0) - timedelta(seconds=1)
         try:
-            supplied = fetch_news([asset.ticker for asset in assets], since)
+            supplied = fetch_news([asset.ticker for asset in assets], since, [industry.name for industry in industries])
         except Exception:
             self.repository.mark_news_status(user_id, "stale")
             self.repository.session.commit()
             return
 
         malformed = False
-        industries = self.repository.followed_industries(user_id)
         for article in supplied:
             if not isinstance(article, NewsArticle) or not _is_valid_article(article):
                 malformed = True
@@ -118,6 +125,8 @@ class RefreshService:
             if matched:
                 self.repository.save_industry_article(user_id, article, article_id, url, matched)
         self.repository.mark_news_status(user_id, "stale" if malformed else "current")
+        if not malformed:
+            self.repository.mark_news_checked_at(user_id, query_started_at)
         self.repository.session.commit()
 
 

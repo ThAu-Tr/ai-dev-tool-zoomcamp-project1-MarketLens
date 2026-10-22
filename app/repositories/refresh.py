@@ -33,12 +33,23 @@ class RefreshRepository:
     def newest_article_at(self, user_id: int) -> datetime | None:
         return self.session.scalar(select(Article.published_at).where(Article.user_id == user_id).order_by(Article.published_at.desc()).limit(1))
 
+    def news_checked_at(self, user_id: int) -> datetime | None:
+        state = self.session.get(RefreshState, user_id)
+        return state.news_checked_at if state else None
+
     def mark_news_status(self, user_id: int, status: str) -> None:
         state = self.session.get(RefreshState, user_id)
         if state is None:
             state = RefreshState(user_id=user_id)
             self.session.add(state)
         state.news_status = status
+
+    def mark_news_checked_at(self, user_id: int, checked_at: datetime) -> None:
+        state = self.session.get(RefreshState, user_id)
+        if state is None:
+            state = RefreshState(user_id=user_id)
+            self.session.add(state)
+        state.news_checked_at = checked_at
 
     def save_direct_article(self, user_id: int, article: NewsArticle, article_id: str, url: str, tickers: list[str]) -> None:
         existing = self.session.scalar(select(Article).where(Article.user_id == user_id, (Article.id == article_id) | (Article.url == url)))

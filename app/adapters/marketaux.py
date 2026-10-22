@@ -15,47 +15,79 @@ class MarketauxProvider:
     """Metadata-only adapter for Marketaux's published news endpoint.
 
     It implements the news portion of ProviderGateway and can be composed with
-    another provider for prices. The API's three-result page size bounds each
-    request; callers should pass only the user's tracked symbols.
+    another provider for prices. Each request is bounded to three results and
+    filtered by the user's tracked symbols and followed industries.
     """
 
     endpoint = "https://api.marketaux.com/v1/news/all"
     max_results = 3
+    # MarketLens exposes a smaller taxonomy than Marketaux. Query with the
+    # closest supported parent industry; results still need #11 evidence to save.
+    industry_filters = {
+        "ai": "Technology",
+        "banking": "Financial Services",
+        "renewable energy": "Energy",
+        "semiconductors": "Technology",
+        "enterprise software": "Technology",
+    }
 
     def __init__(self, api_key: str | None = None, user_agent: str | None = None, timeout: float = 8.0) -> None:
         self.api_key = api_key if api_key is not None else os.getenv("MARKETAUX_API_KEY") or None
         self.user_agent = user_agent if user_agent is not None else os.getenv("MARKETAUX_USER_AGENT", "MarketLens/0.1")
         self.timeout = timeout
 
-    def fetch_news(self, tickers: list[str], since: datetime | None) -> list[NewsArticle]:
+    def fetch_news(self, tickers: list[str], since: datetime | None, industries: list[str] | None = None) -> list[NewsArticle]:
         if not self.api_key:
             return []
         symbols = list(dict.fromkeys(t.strip().upper() for t in tickers if t.strip()))
-        if not symbols:
+        industry_names = list(dict.fromkeys(
+            mapped for name in (industries or [])
+            if (mapped := self.industry_filters.get(name.strip().casefold())) is not None
+        ))
+        if not symbols and not industry_names:
             return []
-        params: dict[str, str] = {
+        common_params: dict[str, str] = {
             "api_token": self.api_key,
-            "symbols": ",".join(symbols),
             "limit": str(self.max_results),
             "language": "en",
         }
         if since is not None:
             if since.tzinfo is None:
                 since = since.replace(tzinfo=UTC)
-            params["published_after"] = since.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
-        request = Request(
-            f"{self.endpoint}?{urlencode(params)}",
-            headers={"Accept": "application/json", "User-Agent": self.user_agent},
-        )
-        try:
-            with urlopen(request, timeout=self.timeout) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except (HTTPError, URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError):
-            # The refresh workflow treats this as an individual news-source failure.
-            raise
-        if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
-            raise ValueError("Marketaux returned an invalid news response.")
-        return [article for item in payload["data"][: self.max_results] if (article := self._article(item, symbols)) is not None]
+            common_params["published_after"] = since.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+        # Keep asset and industry searches separate so an API-side intersection
+        # cannot hide industry-only stories. Each context costs one bounded call.
+        queries = []
+        if symbols:
+            queries.append({"symbols": ",".join(symbols)})
+        if industry_names:
+            queries.append({"industries": ",".join(industry_names)})
+        articles: list[NewsArticle] = []
+        seen: set[str] = set()
+        for query in queries:
+            params = {**common_params, **query}
+            request = Request(
+                f"{self.endpoint}?{urlencode(params)}",
+                headers={"Accept": "application/json", "User-Agent": self.user_agent},
+            )
+            try:
+                with urlopen(request, timeout=self.timeout) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+            except (HTTPError, URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+                # The refresh workflow treats this as an individual news-source failure.
+                raise
+            if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+                raise ValueError("Marketaux returned an invalid news response.")
+            for item in payload["data"][: self.max_results]:
+                article = self._article(item, symbols)
+                if article is None:
+                    continue
+                identity = article.source_identity or article.url
+                if identity not in seen:
+                    seen.add(identity)
+                    articles.append(article)
+        return articles
 
     @staticmethod
     def _article(item: Any, requested_symbols: list[str]) -> NewsArticle | None:
@@ -75,6 +107,7 @@ class MarketauxProvider:
             published_at = published_at.replace(tzinfo=UTC)
         entities = item.get("entities")
         identifiers: list[str] = []
+        industries: list[str] = []
         if isinstance(entities, list):
             for entity in entities:
                 if not isinstance(entity, dict):
@@ -82,9 +115,11 @@ class MarketauxProvider:
                 symbol = entity.get("symbol")
                 if isinstance(symbol, str) and symbol.strip() and symbol.upper() in requested_symbols:
                     identifiers.append(symbol.upper())
-        # Industry strings are provider metadata, retained as identifiers for the
-        # existing conservative classifier to decide whether they are relevant.
-        industries: list[str] = []
+                industry = entity.get("industry")
+                if isinstance(industry, str) and industry.strip():
+                    industries.append(industry.strip())
+        # Marketaux uses entities[].industry (the type remains e.g. "equity").
+        # Retain the optional top-level shape too for compatible fixtures.
         raw_industries = item.get("industries")
         if isinstance(raw_industries, list):
             industries.extend(value.strip() for value in raw_industries if isinstance(value, str) and value.strip())
