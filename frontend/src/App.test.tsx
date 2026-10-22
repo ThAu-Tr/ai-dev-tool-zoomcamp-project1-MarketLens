@@ -76,8 +76,8 @@ describe('dashboard', () => {
 
     getTimelineDay.mockRejectedValueOnce(new Error('Historical market data is currently unavailable.'))
     fireEvent.click(screen.getAllByRole('button', { name: /Load/ })[0])
-    expect(screen.getByRole('alert')).toHaveTextContent('Historical market data is currently unavailable.')
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Historical market data is currently unavailable.')
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     await waitFor(() => expect(getTimelineDay).toHaveBeenCalledTimes(4))
   })
