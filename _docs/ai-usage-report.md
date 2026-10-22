@@ -17,6 +17,7 @@ Do not document every prompt or every issue. Aim for approximately 4–6 useful 
 | #5, #9 | GPT-5.6 Luna | Medium | 25% | Combined parallel implementation; engineering and QA |
 | #4 | GPT-5.6 Terra | Medium | 10% | Additional session to complete #4; both #4 and #10 now closed |
 | #11, #14 | GPT-6 Luna | Medium | 15% | Parallel implementation, engineering and QA |
+| #12 | GPT-6 Luna | Medium | 10% | Implementation and QA using "Approve for me" mode |
 
 Usage percentages reflect the reported share of the five-hour Codex allowance for each session, **not per-issue costs or measured token counts**. Tasks differed in complexity, and the Terra session also included PM work, so the figures are not a controlled model benchmark.
 
