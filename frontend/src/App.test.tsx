@@ -51,35 +51,58 @@ const populatedDashboard: Dashboard = {
   lastRefreshedAt: '2026-10-20T09:45:00Z',
 }
 
+const localDateString = (daysAgo: number) => {
+  const date = new Date()
+  date.setDate(date.getDate() - daysAgo)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+const localDateLabel = (isoDate: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date(`${isoDate}T12:00:00`))
+
 describe('dashboard', () => {
   beforeEach(() => { vi.resetAllMocks(); setIndustryFollowed.mockResolvedValue({ id: 'industry', name: 'Industry', followed: false }); searchAssets.mockResolvedValue([]); getIndustries.mockResolvedValue([]); removeAsset.mockResolvedValue(); saveLots.mockResolvedValue(populatedDashboard.assets[0]); saveStatus.mockResolvedValue(populatedDashboard.assets[0]); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
 
   it('loads the selected historical date through the timeline API and exposes retryable errors', async () => {
     getDashboard.mockResolvedValue(populatedDashboard)
     let finishInitialLoad!: (day: TimelineDay) => void
-    getTimelineDay.mockImplementationOnce(() => new Promise<TimelineDay>((resolve) => { finishInitialLoad = resolve }))
+    getTimelineDay.mockImplementationOnce((date) => new Promise<TimelineDay>((resolve) => { finishInitialLoad = (day) => resolve({ ...day, date }) }))
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: 'Timeline' }))
     await waitFor(() => expect(getTimelineDay).toHaveBeenCalled())
     expect(screen.getByText(/Loading and saving this day’s prices/)).toBeInTheDocument()
-    finishInitialLoad({ date: '2026-10-21', source: 'newly-loaded', assets: [{ ...populatedDashboard.assets[0], price: 201.25, changePercent: -1.2 }], articles: [], summaries: [] })
+    const firstDay = localDateString(1)
+    expect(getTimelineDay).toHaveBeenLastCalledWith(firstDay)
+    const dateButtons = screen.getAllByRole('button', { name: /Load/ })
+    expect(dateButtons).toHaveLength(30)
+    expect(dateButtons[0]).toHaveAccessibleName(`Load ${localDateLabel(firstDay)}`)
+    expect(dateButtons[29]).toHaveAccessibleName(`Load ${localDateLabel(localDateString(30))}`)
+    finishInitialLoad({ date: firstDay, source: 'newly-loaded', assets: [{ ...populatedDashboard.assets[0], price: 201.25, changePercent: -1.2 }], articles: [], summaries: [] })
     expect(await screen.findByText('Newly retrieved')).toBeInTheDocument()
     expect(screen.getByText('201.25 EUR')).toBeInTheDocument()
 
-    getTimelineDay.mockResolvedValueOnce({ date: '2026-10-20', source: 'archive', marketClosed: true, assets: [], articles: [], summaries: [] })
-    const initialRequestDate = getTimelineDay.mock.calls[0][0]
-    fireEvent.click(screen.getAllByRole('button', { name: /Load/ })[1])
+    const secondDay = localDateString(2)
+    getTimelineDay.mockImplementationOnce(async (date) => ({ date, source: 'archive', assets: [{ ...populatedDashboard.assets[0], price: 200.5 }], articles: [], summaries: [] }))
+    fireEvent.click(screen.getByRole('button', { name: `Load ${localDateLabel(secondDay)}` }))
     await waitFor(() => expect(getTimelineDay).toHaveBeenCalledTimes(2))
-    expect(getTimelineDay.mock.calls[1][0]).not.toEqual(initialRequestDate)
     expect(await screen.findByText('Loaded from archive')).toBeInTheDocument()
-    expect(screen.getByText('No market-day data')).toBeInTheDocument()
+    expect(screen.getByText('200.5 EUR')).toBeInTheDocument()
 
+    const thirdDay = localDateString(3)
     getTimelineDay.mockRejectedValueOnce(new Error('Historical market data is currently unavailable.'))
-    fireEvent.click(screen.getAllByRole('button', { name: /Load/ })[0])
-    expect(await screen.findByRole('alert')).toHaveTextContent('Historical market data is currently unavailable.')
+    fireEvent.click(screen.getByRole('button', { name: `Load ${localDateLabel(thirdDay)}` }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(`Could not load ${localDateLabel(thirdDay)}: Historical market data is currently unavailable.`)
     expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: localDateLabel(secondDay) })).toBeInTheDocument()
+    expect(screen.getByText('200.5 EUR')).toBeInTheDocument()
+    getTimelineDay.mockImplementationOnce(async (date) => ({ date, source: 'newly-loaded', assets: [{ ...populatedDashboard.assets[0], price: 199.5 }], articles: [], summaries: [] }))
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    await waitFor(() => expect(getTimelineDay).toHaveBeenCalledTimes(4))
+    expect(await screen.findByText('199.5 EUR')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: localDateLabel(thirdDay) })).toBeInTheDocument()
+
+    const fourthDay = localDateString(4)
+    getTimelineDay.mockImplementationOnce(async (date) => ({ date, source: 'newly-loaded', marketClosed: true, assets: [], articles: [], summaries: [] }))
+    fireEvent.click(screen.getByRole('button', { name: `Load ${localDateLabel(fourthDay)}` }))
+    await waitFor(() => expect(getTimelineDay).toHaveBeenCalledTimes(5))
+    expect(await screen.findByText('No market-day data')).toBeInTheDocument()
   })
 
   it('separates followed and available industries, and moves an industry after a successful save', async () => {
