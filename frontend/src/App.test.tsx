@@ -156,6 +156,25 @@ describe('dashboard', () => {
     expect(screen.getByRole('link', { name: /SAP update/i })).toHaveAttribute('href', 'https://example.test/sap')
   })
 
+  it('shows industry news in its own feed with matching industry labels and a useful empty state', async () => {
+    const industryArticle = { id: 'industry-1', headline: 'Semiconductor demand outlook', source: 'Market Wire', publishedAt: '2026-10-20T09:00:00Z', relevance: 'Industry news' as const, assets: [], industries: ['Semiconductors', 'Enterprise software'], snippet: 'Stored sector report.', url: 'https://example.test/industry' }
+    getDashboard.mockResolvedValue({ ...populatedDashboard, articles: [...populatedDashboard.articles, industryArticle] })
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Industry news' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Semiconductor demand outlook/i })).toHaveAttribute('href', industryArticle.url)
+    expect(screen.getByText('Semiconductors')).toBeInTheDocument()
+    expect(screen.getByText('Enterprise software')).toBeInTheDocument()
+
+  })
+
+  it('explains when no followed-industry articles are stored', async () => {
+    getDashboard.mockResolvedValue({ ...populatedDashboard, articles: [] })
+    render(<App />)
+    expect(await screen.findByText('No relevant industry news is stored for your followed industries yet.')).toBeInTheDocument()
+  })
+
   it('renders a first-use state when the stored dashboard has no assets', async () => {
     getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
 

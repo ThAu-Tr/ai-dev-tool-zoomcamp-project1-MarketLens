@@ -6,7 +6,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Article, Asset, DemoUser, RefreshState
+from app.models import Article, Asset, DemoUser, Industry, IndustryFollow, RefreshState
 from app.providers import MarketQuote, NewsArticle
 
 
@@ -19,6 +19,12 @@ class RefreshRepository:
 
     def assets_for(self, user_id: int) -> list[Asset]:
         return list(self.session.scalars(select(Asset).where(Asset.user_id == user_id).order_by(Asset.ticker)))
+
+    def followed_industries(self, user_id: int) -> list[Industry]:
+        return list(self.session.scalars(
+            select(Industry).join(IndustryFollow, IndustryFollow.industry_id == Industry.id)
+            .where(IndustryFollow.user_id == user_id).order_by(Industry.id)
+        ))
 
     def last_refreshed_at(self, user_id: int) -> datetime | None:
         state = self.session.get(RefreshState, user_id)
@@ -38,8 +44,20 @@ class RefreshRepository:
         existing = self.session.scalar(select(Article).where(Article.user_id == user_id, (Article.id == article_id) | (Article.url == url)))
         if existing is not None:
             existing.assets = sorted(set(existing.assets).union(tickers))
+            existing.relevance = "Direct asset news"
+            existing.industries = []
             return
         self.session.add(Article(id=article_id, user_id=user_id, headline=article.headline, source=article.source, published_at=article.published_at, relevance="Direct asset news", assets=sorted(tickers), industries=[], snippet=article.snippet, url=url))
+
+    def save_industry_article(self, user_id: int, article: NewsArticle, article_id: str, url: str, industry_ids: list[str]) -> None:
+        existing = self.session.scalar(select(Article).where(Article.user_id == user_id, (Article.id == article_id) | (Article.url == url)))
+        if existing is not None:
+            # A previously direct article keeps direct-news precedence. Other
+            # industry links are unioned when a later refresh finds more matches.
+            if existing.relevance == "Industry news":
+                existing.industries = sorted(set(existing.industries).union(industry_ids))
+            return
+        self.session.add(Article(id=article_id, user_id=user_id, headline=article.headline, source=article.source, published_at=article.published_at, relevance="Industry news", assets=[], industries=sorted(set(industry_ids)), snippet=article.snippet, url=url))
 
     def mark_unavailable(self, user_id: int, tickers: list[str]) -> None:
         state = self.session.get(RefreshState, user_id)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Article, Asset, ContextSummary, DemoUser, RefreshState
+from app.models import Article, Asset, ContextSummary, DemoUser, Industry, RefreshState
 
 
 class DashboardRepository:
@@ -22,6 +22,12 @@ class DashboardRepository:
 
     def articles_for(self, user_id: int) -> list[Article]:
         return list(self.session.scalars(select(Article).where(Article.user_id == user_id).order_by(Article.published_at.desc())))
+
+    def industry_names(self, industry_ids: list[str]) -> dict[str, str]:
+        if not industry_ids:
+            return {}
+        rows = self.session.scalars(select(Industry).where(Industry.id.in_(industry_ids)))
+        return {industry.id: industry.name for industry in rows}
 
     def summaries_for(self, user_id: int) -> list[ContextSummary]:
         return list(self.session.scalars(select(ContextSummary).where(ContextSummary.user_id == user_id).order_by(ContextSummary.id)))

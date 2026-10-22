@@ -22,6 +22,7 @@ class DashboardService:
 
         assets = self.repository.assets_for(user.id)
         articles = self.repository.articles_for(user.id)
+        industry_names = self.repository.industry_names(sorted({industry_id for article in articles for industry_id in article.industries}))
         summaries = self.repository.summaries_for(user.id)
         refresh_state = self.repository.refresh_state_for(user.id)
 
@@ -52,7 +53,7 @@ class DashboardService:
                     publishedAt=_as_utc(article.published_at),
                     relevance=article.relevance,
                     assets=article.assets,
-                    industries=article.industries,
+                    industries=[industry_names.get(industry_id, industry_id) for industry_id in article.industries],
                     snippet=article.snippet,
                     url=article.url,
                 )

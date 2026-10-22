@@ -171,7 +171,8 @@ function AssetCard({ asset, onManage }: { asset: Asset; onManage: () => void }) 
 }
 
 function NewsGroup({ title, description, articles }: { title: string; description: string; articles: Dashboard['articles'] }) {
-  return <section className="news-group"><div className="news-title"><h3>{title}</h3><p>{description}</p></div>{articles.length ? <div className="article-stack">{articles.map((article) => <ArticleCard key={article.id} article={article} />)}</div> : <p className="empty-copy">No relevant news is stored here yet.</p>}</section>
+  const empty = title === 'Industry news' ? 'No relevant industry news is stored for your followed industries yet.' : 'No relevant news is stored here yet.'
+  return <section className="news-group"><div className="news-title"><h3>{title}</h3><p>{description}</p></div>{articles.length ? <div className="article-stack">{articles.map((article) => <ArticleCard key={article.id} article={article} />)}</div> : <p className="empty-copy">{empty}</p>}</section>
 }
 
 function ArticleCard({ article }: { article: Dashboard['articles'][number] }) {

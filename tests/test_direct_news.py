@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from app.models import Article, Asset, DemoUser, RefreshState
+from app.models import Article, Asset, DemoUser, Industry, IndustryFollow, RefreshState
 from app.providers import MarketQuote, NewsArticle
 from tests.test_dashboard import build_client
 from tests.test_refresh import session_factory  # noqa: F401 - pytest fixture
@@ -77,3 +77,56 @@ def test_news_failure_preserves_persisted_articles_and_does_not_undo_price_updat
     dashboard = build_client(session_factory).get("/api/dashboard").json()
     assert dashboard["newsStatus"] == "stale"
     assert dashboard["articles"][0]["snippet"] is None
+
+
+def test_refresh_saves_only_followed_industry_matches_and_direct_news_takes_precedence(session_factory):
+    seed_assets(session_factory)
+    with session_factory.begin() as session:
+        session.add_all([
+            Industry(id="semi", name="Semiconductors"),
+            Industry(id="software", name="Enterprise software"),
+            Industry(id="energy", name="Renewable energy"),
+            IndustryFollow(user_id=1, industry_id="semi"),
+            IndustryFollow(user_id=1, industry_id="software"),
+        ])
+        # Persisted asset tags are the taxonomy evidence associated with follows.
+        session.get(Asset, "sap").industries = ["Enterprise software"]
+        session.get(Asset, "asml").industries = ["Semiconductors"]
+    provider = FakeNewsProvider([
+        news("Semiconductors and enterprise software outlook", [], url="https://news.example/multi", identity="multi"),
+        news("Renewable energy outlook", [], url="https://news.example/unfollowed", identity="unfollowed"),
+        news("What analysts said about the outlook", [], url="https://news.example/substring", identity="substring"),
+        news("Semiconductors supplier update", ["ASML"], url="https://news.example/direct-sector", identity="direct"),
+    ])
+
+    response = build_client(session_factory, provider).post("/api/refresh")
+    assert response.status_code == 200
+    with session_factory() as session:
+        articles = session.query(Article).order_by(Article.url).all()
+        assert [(article.url, article.relevance, article.industries, article.assets) for article in articles] == [
+            ("https://news.example/direct-sector", "Direct asset news", [], ["ASML"]),
+            ("https://news.example/multi", "Industry news", ["semi", "software"], []),
+        ]
+
+    dashboard = build_client(session_factory).get("/api/dashboard")
+    industry_article = next(article for article in dashboard.json()["articles"] if article["relevance"] == "Industry news")
+    assert industry_article["industries"] == ["Semiconductors", "Enterprise software"]
+
+    build_client(session_factory, provider).post("/api/refresh")
+    with session_factory() as session:
+        assert session.query(Article).count() == 2
+
+
+def test_refresh_does_not_infer_industry_relevance_from_unfollowed_or_uncertain_text(session_factory):
+    seed_assets(session_factory)
+    with session_factory.begin() as session:
+        session.add_all([Industry(id="semi", name="Semiconductors"), Industry(id="ai", name="AI")])
+        session.add(IndustryFollow(user_id=1, industry_id="ai"))
+    provider = FakeNewsProvider([
+        news("Semiconductors outlook", [], url="https://news.example/not-followed", identity="not-followed"),
+        news("A general technology update", [], url="https://news.example/uncertain", identity="uncertain"),
+    ])
+    response = build_client(session_factory, provider).post("/api/refresh")
+    assert response.status_code == 200
+    with session_factory() as session:
+        assert session.query(Article).count() == 0

@@ -404,7 +404,7 @@ components:
         newsStatus:
           type: string
           enum: [current, stale]
-          description: Whether direct-news retrieval completed during the latest refresh.
+          description: Whether direct-asset and industry-news retrieval completed during the latest refresh.
     Industry:
       type: object
       required: [id, name, followed]
