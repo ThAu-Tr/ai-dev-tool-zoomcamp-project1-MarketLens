@@ -19,7 +19,8 @@ followed industry links. Leave unsupported stories Not Relevant. Direct asset ne
 precedence over Industry news, which takes precedence over Market context.
 For summaries, select at most two supplied article IDs per asset that offer possible context
 alongside its persisted movement. Return no entry if support is missing. The service renders
-qualified wording from verified source headlines; do not return free-form prose.
+qualified wording from typed persisted movement and report categories, never article
+prose; do not return free-form prose.
 Return only the requested JSON schema, no extra keys."""
 
 

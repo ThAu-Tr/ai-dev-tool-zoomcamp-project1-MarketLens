@@ -1,7 +1,7 @@
 """Two bounded AI selections over stored evidence, only after manual refresh.
 
-The model chooses links, never dashboard prose. Constrained rendering keeps source
-facts distinct from interpretation and prevents invented/advisory/causal text.
+The model chooses links, never dashboard prose. Only typed persisted movement and
+report-category facts are rendered; untrusted article prose never enters summaries.
 """
 from __future__ import annotations
 
@@ -23,9 +23,7 @@ INDUSTRY_CUES = {
 }
 MARKET_CUES = ["bond yields", "treasury yields", "equity futures", "recession", "risk sentiment",
                "central bank", "inflation", "interest rates", "tariffs", "global markets"]
-# Article text is never trusted as instructions or app-authored advice. Skip
-# provocative/advisory/instructional headlines instead of quoting them in a card.
-UNSAFE = re.compile(r"\b(buy|sell|hold|recommend\w*|invest\w*|should|must|target\w*|confidence|caus\w*|because|drove|driven|led to|resulted|ignore|instructions?|prompt|system|assistant|guarantee\w*)\b|https?://|[<>{}]", re.I)
+
 
 
 def _utc(value: datetime) -> datetime:
@@ -43,7 +41,7 @@ def _quote_supported(quote: object, text: str, cues: list[str]) -> bool:
 def _safe_article(article) -> bool:
     parts = urlsplit(article.url)
     return (parts.scheme in ("http", "https") and bool(parts.netloc) and not parts.username
-            and 1 <= len(article.headline) <= 180 and not UNSAFE.search(article.headline))
+            and bool(article.headline.strip()))
 
 
 def _relevant(article, asset, followed: dict[str, str]) -> bool:
@@ -118,7 +116,7 @@ class ContextService:
             if not relevant:
                 continue
             # All supplied evidence, not just selected IDs, invalidates a stale card.
-            facts = [asset.id, str(asset.price), asset.currency, str(asset.change_percent), _utc(asset.as_of).isoformat(),
+            facts = ["typed-context-v2", asset.id, str(asset.price), asset.currency, str(asset.change_percent), _utc(asset.as_of).isoformat(),
                      [(a.id, a.headline, a.snippet, a.relevance, a.assets, a.industries, a.url) for a in relevant]]
             fingerprint = "ai-" + sha256(asset.id.encode()).hexdigest()[:16] + "-" + sha256(json.dumps(facts, sort_keys=True).encode()).hexdigest()[:40]
             if not any(row.id == fingerprint for row in self.repository.summaries_for(user_id, asset.id)):
@@ -193,8 +191,15 @@ class ContextService:
             if (not isinstance(ids, list) or not 1 <= len(ids) <= 2 or not all(isinstance(i, str) for i in ids)
                     or len(set(ids)) != len(ids) or any(i not in by_id for i in ids)):
                 continue
-            headlines = "; ".join(f'“{by_id[i].headline}”' for i in ids)
-            text = (f"Possible context alongside {asset.ticker}'s {asset.change_percent:+.2f}% movement: "
-                    f"source reporting titled {headlines}. These reports may be relevant; they do not establish a cause of the movement.")
+            # Never quote or paraphrase untrusted source prose here. Even an
+            # attributed headline can repeat advice, targets or causal claims.
+            labels = {"Direct asset news": "direct asset", "Industry news": "industry", "Market context": "broader market"}
+            counts = {category: sum(by_id[i].relevance == category for i in ids) for category in labels}
+            reports = ", ".join(f"{count} {labels[category]} report{'s' if count != 1 else ''}"
+                                for category, count in counts.items() if count)
+            price = format(asset.price.normalize(), "f")
+            text = (f"Possible context alongside {asset.ticker}'s {asset.change_percent:+.2f}% movement "
+                    f"(stored price {price} {asset.currency}): {reports} linked below. "
+                    "These reports may be relevant; they do not establish a cause of the movement.")
             if len(text) <= 600:
                 self.repository.save_summary(user_id, asset.id, fingerprint, text, ids)
