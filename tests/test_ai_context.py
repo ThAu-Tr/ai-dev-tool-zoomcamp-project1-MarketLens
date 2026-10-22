@@ -350,3 +350,22 @@ def test_ai_checkpoint_migration_preserves_existing_data(tmp_path, monkeypatch):
         assert list(connection.execute(text("SELECT * FROM demo_users"))) == before
     assert "ai_checked_at" in {column["name"] for column in inspect(engine).get_columns("refresh_states")}
     engine.dispose()
+
+
+def test_inflight_ai_cannot_overwrite_new_deterministic_classification(session_factory):
+    prepare(session_factory, article(category="Unclassified", assets=[]))
+    provider = FakeAI()
+    original = provider.generate_context
+    def classify_after_direct_refresh(task, evidence):
+        if task == "classify":
+            with session_factory.begin() as session:
+                row = session.get(Article, "report")
+                row.relevance = "Direct asset news"
+                row.assets = ["SAP"]
+            return {"classifications": [classification(relevance="Not Relevant", assets=[])]}
+        return original(task, evidence)
+    provider.generate_context = classify_after_direct_refresh
+    run(session_factory, provider)
+    with session_factory() as session:
+        assert session.get(Article, "report").relevance == "Direct asset news"
+        assert session.query(ContextSummary).one().article_ids == ["report"]

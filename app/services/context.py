@@ -157,9 +157,7 @@ class ContextService:
                          else "Market context" if market_quote else "Not Relevant")
             if row["relevance"] != relevance:
                 continue
-            article.relevance = relevance
-            article.assets = linked_assets
-            article.industries = [] if linked_assets else linked_industries
+            self.repository.classify_article(article, relevance, linked_assets, [] if linked_assets else linked_industries)
 
     @staticmethod
     def _validated_links(links, text, available):

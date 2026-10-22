@@ -76,7 +76,7 @@ describe('dashboard', () => {
     render(<App />)
     expect(await screen.findByText('No AI context is stored yet.')).toBeInTheDocument()
     expect(screen.queryByText('AI-generated context')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /Refresh data/ })).toBeEnabled()
   })
 
   it('loads the selected historical date through the timeline API and exposes retryable errors', async () => {

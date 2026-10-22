@@ -29,6 +29,14 @@ class ContextRepository(RefreshRepository):
             Article.user_id == user_id, Article.relevance.in_(categories), Article.published_at >= since,
         ).order_by(Article.published_at.desc(), Article.id).limit(5 if ambiguous else 12)))
 
+    def classify_article(self, article: Article, relevance: str, assets: list[str], industries: list[str]) -> None:
+        # A concurrent deterministic refresh may have promoted this candidate
+        # while the AI request was in flight. Never overwrite that classification.
+        self.session.execute(update(Article).where(
+            Article.id == article.id, Article.user_id == article.user_id, Article.relevance == "Unclassified",
+        ).values(relevance=relevance, assets=assets, industries=industries).execution_options(synchronize_session="fetch"))
+        self.session.expire(article)
+
     def summaries_for(self, user_id: int, asset_id: str) -> list[ContextSummary]:
         return list(self.session.scalars(select(ContextSummary).where(
             ContextSummary.user_id == user_id, ContextSummary.asset_id == asset_id,
