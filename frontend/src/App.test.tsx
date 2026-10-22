@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { dashboardApi } from './api/dashboardApi'
@@ -68,8 +68,8 @@ describe('dashboard', () => {
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: 'Timeline' }))
     await waitFor(() => expect(getTimelineDay).toHaveBeenCalled())
-    expect(screen.getByText(/Loading and saving this day’s prices/)).toBeInTheDocument()
     const firstDay = localDateString(1)
+    expect(screen.getByText(new RegExp(`Loading ${localDateLabel(firstDay)}`))).toBeInTheDocument()
     expect(getTimelineDay).toHaveBeenLastCalledWith(firstDay)
     const dateButtons = screen.getAllByRole('button', { name: /Load/ })
     expect(dateButtons).toHaveLength(30)
@@ -166,8 +166,8 @@ describe('dashboard', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Watchlist' }))
     fireEvent.click(await screen.findByRole('button', { name: /Industries 1/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Unfollow' }))
-    expect(await screen.findByText('From ASML')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Follow' })).toBeInTheDocument()
+    expect(screen.getByText('From ASML')).toBeInTheDocument()
   })
 
   it('separates watchlist suggestions, shows supporting assets, and removes one after following', async () => {
@@ -179,9 +179,11 @@ describe('dashboard', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Watchlist' }))
     fireEvent.click(await screen.findByRole('button', { name: /Industries 0/ }))
     expect(await screen.findByText('SUGGESTED FROM WATCHLIST')).toBeInTheDocument()
-    expect(screen.getByText('From ASML, SMH')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Follow' }))
+    const suggestedRow = screen.getByText('From ASML, SMH').closest('.industry-row')
+    expect(suggestedRow).not.toBeNull()
+    fireEvent.click(within(suggestedRow as HTMLElement).getByRole('button', { name: 'Follow' }))
     await waitFor(() => expect(setIndustryFollowed).toHaveBeenCalledWith('semi', true))
+    expect(await screen.findByRole('button', { name: 'Unfollow' })).toBeInTheDocument()
     expect(screen.queryByText('From ASML, SMH')).not.toBeInTheDocument()
   })
 
