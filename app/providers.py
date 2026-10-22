@@ -46,6 +46,14 @@ class NewsArticle:
     industry_identifiers: list[str] | None = None
 
 
+class PartialNewsProviderError(RuntimeError):
+    """A later bounded query failed after earlier queries returned articles."""
+
+    def __init__(self, message: str, articles: list[NewsArticle]) -> None:
+        super().__init__(message)
+        self.articles = articles
+
+
 class ProviderGateway(Protocol):
     """Boundary for external market, news, and AI adapters.
 

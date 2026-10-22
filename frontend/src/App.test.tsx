@@ -229,6 +229,23 @@ describe('dashboard', () => {
     expect(await screen.findByText('No relevant industry news is stored for your followed industries yet.')).toBeInTheDocument()
   })
 
+  it('renders stored market context with its source link and a clear empty state', async () => {
+    const marketArticle = { id: 'market-1', headline: 'Central bank holds interest rates steady', source: 'Market Wire', publishedAt: '2026-10-20T09:00:00Z', relevance: 'Market context' as const, assets: [], industries: [], snippet: 'The decision leaves policy unchanged.', url: 'https://example.test/market' }
+    getDashboard.mockResolvedValueOnce({ ...populatedDashboard, articles: [marketArticle] })
+    const { unmount } = render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Market context' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Central bank holds interest rates steady/i })).toHaveAttribute('href', marketArticle.url)
+    const marketLink = screen.getByRole('link', { name: /Central bank holds interest rates steady/i })
+    expect(marketLink).toHaveTextContent('Market Wire')
+    expect(marketLink).toHaveTextContent('2026-10-20T09:00:00Z')
+    unmount()
+
+    getDashboard.mockResolvedValueOnce({ ...populatedDashboard, articles: [] })
+    render(<App />)
+    expect(await screen.findByText('No broader market context is stored yet.')).toBeInTheDocument()
+  })
+
   it('renders a first-use state when the stored dashboard has no assets', async () => {
     getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
 

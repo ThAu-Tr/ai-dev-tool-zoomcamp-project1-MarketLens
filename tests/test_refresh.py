@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.db import Base
-from app.models import Asset, DemoUser, RefreshState
-from app.providers import MarketDataResult, MarketQuote
+from app.models import Article, Asset, DemoUser, Industry, IndustryFollow, RefreshState
+from app.providers import MarketDataResult, MarketQuote, NewsArticle, PartialNewsProviderError
 from tests.test_dashboard import build_client
 
 
@@ -118,3 +118,113 @@ def test_watermark_uses_latest_successful_quote_time(session_factory):
     assert response.json()["lastRefreshedAt"] == "2026-10-21T12:00:00Z"
     with session_factory() as session:
         assert session.get(RefreshState, 1).last_refreshed_at == quote_time.replace(tzinfo=None)
+
+
+class FakeNewsProvider(FakeMarketProvider):
+    def __init__(self, articles: list[NewsArticle] | None = None, context: list[NewsArticle] | None = None, *, context_error: Exception | None = None):
+        super().__init__([MarketQuote("SAP", Decimal("101"), "EUR", Decimal("1"), datetime(2026, 10, 22, 9, tzinfo=UTC))])
+        self.articles = articles or []
+        self.context = context or []
+        self.context_error = context_error
+        self.context_calls = 0
+
+    def fetch_news(self, tickers, since, industries=None):
+        return self.articles
+
+    def fetch_market_context(self, since, tickers=None):
+        self.context_calls += 1
+        if self.context_error:
+            raise self.context_error
+        return self.context
+
+
+def news_article(headline: str, url: str, *, identifiers: list[str] | None = None, industries: list[str] | None = None) -> NewsArticle:
+    return NewsArticle(headline, "Market Wire", datetime(2026, 10, 22, 8, tzinfo=UTC), url, identifiers or [], snippet="Source supplied context.", industry_identifiers=industries or [])
+
+
+def test_market_context_matches_explicit_macro_events_and_omits_irrelevant_items(session_factory):
+    seed_asset(session_factory)
+    provider = FakeNewsProvider(context=[
+        news_article("Central bank holds interest rates steady", "https://news.test/rates"),
+        news_article("Celebrity launches a new product line", "https://news.test/celebrity"),
+    ])
+
+    response = build_client(session_factory, provider).post("/api/refresh")
+
+    assert response.status_code == 200
+    with session_factory() as session:
+        articles = list(session.query(Article))
+        assert [(article.headline, article.relevance, article.assets, article.industries, article.snippet) for article in articles] == [
+            ("Central bank holds interest rates steady", "Market context", [], [], "Source supplied context.")
+        ]
+        assert session.get(RefreshState, 1).market_context_checked_at is not None
+
+
+def test_market_context_respects_direct_and_industry_precedence_and_deduplicates(session_factory):
+    seed_asset(session_factory)
+    with session_factory.begin() as session:
+        session.add(Industry(id="semis", name="Semiconductors"))
+        session.add(IndustryFollow(user_id=1, industry_id="semis"))
+    direct = news_article("Inflation report mentions SAP", "https://news.test/direct", identifiers=["SAP"])
+    industry = news_article("Export controls affect semiconductors", "https://news.test/industry", industries=["Semiconductors"])
+    provider = FakeNewsProvider(articles=[direct, industry], context=[direct, industry, news_article("Inflation cools", "https://news.test/macro?utm_source=test")])
+
+    client = build_client(session_factory, provider)
+    assert client.post("/api/refresh").status_code == 200
+    assert client.post("/api/refresh").status_code == 200
+    with session_factory() as session:
+        rows = {article.url: article for article in session.query(Article)}
+        assert len(rows) == 3
+        assert rows["https://news.test/direct"].relevance == "Direct asset news"
+        assert rows["https://news.test/industry"].relevance == "Industry news"
+        assert rows["https://news.test/macro"].relevance == "Market context"
+        assert rows["https://news.test/macro"].assets == []
+        assert rows["https://news.test/macro"].industries == []
+        assert provider.context_calls == 1
+
+
+def test_dashboard_returns_stored_market_context_without_provider_calls(session_factory):
+    seed_asset(session_factory)
+    with session_factory.begin() as session:
+        session.add(Article(id="macro", user_id=1, headline="GDP growth slows", source="Market Wire", published_at=datetime(2026, 10, 22, 8, tzinfo=UTC), relevance="Market context", assets=[], industries=[], snippet=None, url="https://news.test/gdp"))
+    provider = FakeNewsProvider()
+
+    response = build_client(session_factory, provider).get("/api/dashboard")
+
+    assert response.status_code == 200
+    assert response.json()["articles"][0] == {
+        "id": "macro", "headline": "GDP growth slows", "source": "Market Wire",
+        "publishedAt": "2026-10-22T08:00:00Z", "relevance": "Market context",
+        "assets": [], "industries": [], "snippet": None, "url": "https://news.test/gdp",
+    }
+    assert provider.calls == []
+    assert provider.context_calls == 0
+
+
+def test_market_context_provider_failure_keeps_quotes_and_marks_news_stale(session_factory):
+    seed_asset(session_factory)
+    provider = FakeNewsProvider(context_error=TimeoutError("offline"))
+
+    response = build_client(session_factory, provider).post("/api/refresh")
+
+    assert response.status_code == 200
+    with session_factory() as session:
+        assert session.get(Asset, "sap").price == Decimal("101.000000")
+        assert session.get(RefreshState, 1).news_status == "stale"
+        assert session.query(Article).count() == 0
+
+
+def test_partial_news_failure_saves_successful_results_and_keeps_existing_articles(session_factory):
+    seed_asset(session_factory)
+    preserved = news_article("Older inflation report", "https://news.test/older")
+    with session_factory.begin() as session:
+        session.add(Article(id="older", user_id=1, headline=preserved.headline, source=preserved.source, published_at=preserved.published_at, relevance="Market context", assets=[], industries=[], snippet=None, url=preserved.url))
+    provider = FakeNewsProvider()
+    provider.fetch_news = lambda tickers, since, industries=None: (_ for _ in ()).throw(PartialNewsProviderError("partial", [news_article("Payrolls rise", "https://news.test/jobs")]))
+
+    response = build_client(session_factory, provider).post("/api/refresh")
+
+    assert response.status_code == 200
+    with session_factory() as session:
+        assert {article.url for article in session.query(Article)} == {"https://news.test/older", "https://news.test/jobs"}
+        assert session.get(RefreshState, 1).news_status == "stale"

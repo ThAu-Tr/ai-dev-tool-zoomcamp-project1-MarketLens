@@ -104,12 +104,18 @@ class RefreshService:
         query_started_at = datetime.now(UTC).replace(microsecond=0) - timedelta(seconds=1)
         try:
             supplied = fetch_news([asset.ticker for asset in assets], since, [industry.name for industry in industries])
-        except Exception:
-            self.repository.mark_news_status(user_id, "stale")
-            self.repository.session.commit()
-            return
+        except Exception as error:
+            partial_articles = getattr(error, "articles", None)
+            if partial_articles is None:
+                self.repository.mark_news_status(user_id, "stale")
+                self.repository.session.commit()
+                return
+            supplied = partial_articles
+            malformed = True
 
-        malformed = False
+        else:
+            malformed = False
+        context_articles: list[NewsArticle] = []
         for article in supplied:
             if not isinstance(article, NewsArticle) or not _is_valid_article(article):
                 malformed = True
@@ -124,6 +130,36 @@ class RefreshService:
             matched = _matched_industries(article, industries)
             if matched:
                 self.repository.save_industry_article(user_id, article, article_id, url, matched)
+            elif _is_market_wide_context(article):
+                self.repository.save_market_context_article(user_id, article, article_id, url)
+        fetch_market_context = getattr(self.provider, "fetch_market_context", None)
+        context_checked_at = self.repository.market_context_checked_at(user_id)
+        if callable(fetch_market_context) and (
+            context_checked_at is None
+            or _as_utc(context_checked_at).date() < query_started_at.date()
+        ):
+            try:
+                context_articles = fetch_market_context(since, [asset.ticker for asset in assets])
+            except Exception:
+                malformed = True
+            else:
+                self.repository.mark_market_context_checked_at(user_id, query_started_at)
+        for article in context_articles:
+            if not isinstance(article, NewsArticle) or not _is_valid_article(article):
+                malformed = True
+                continue
+            tickers = _direct_tickers(article, assets)
+            url = _canonical_url(article.url)
+            identity = article.source_identity or url
+            article_id = "news-" + sha256(f"{article.source}|{identity}".encode()).hexdigest()[:32]
+            if tickers:
+                self.repository.save_direct_article(user_id, article, article_id, url, tickers)
+            else:
+                matched = _matched_industries(article, industries)
+                if matched:
+                    self.repository.save_industry_article(user_id, article, article_id, url, matched)
+                elif _is_market_wide_context(article):
+                    self.repository.save_market_context_article(user_id, article, article_id, url)
         self.repository.mark_news_status(user_id, "stale" if malformed else "current")
         if not malformed:
             self.repository.mark_news_checked_at(user_id, query_started_at)
@@ -176,3 +212,18 @@ def _matched_industries(article: NewsArticle, industries: list[object]) -> list[
         if name and (name.casefold() in supplied_industries or re.search(rf"(?<!\w){re.escape(name.casefold())}(?!\w)", text)):
             matched.append(industry.id)
     return sorted(set(matched))
+
+
+_MARKET_CONTEXT_PATTERNS = (
+    r"\b(?:central bank|federal reserve|\bfed\b|ecb|bank of england|monetary policy|interest rates?|rate cuts?|rate hikes?)\b",
+    r"\b(?:inflation|consumer price index|\bcpi\b|\bpce\b|gross domestic product|\bgdp\b|payrolls?|jobs report|unemployment|retail sales|pmi)\b",
+    r"\b(?:tariffs?|trade restrictions?|export controls?|sanctions?)\b",
+    r"\b(?:geopolitical|war|invasion|armed conflict|oil prices?|crude prices?|natural gas prices?|\bopec\b|energy shock)\b",
+    r"\b(?:stock market|global markets?|wall street|s&p 500|nasdaq|dow jones|dax|european shares)\b",
+)
+
+
+def _is_market_wide_context(article: NewsArticle) -> bool:
+    """Require an explicit macro, policy, geopolitical, energy, or broad-market signal."""
+    text = f"{article.headline} {article.snippet or ''}"
+    return any(re.search(pattern, text, re.IGNORECASE) for pattern in _MARKET_CONTEXT_PATTERNS)

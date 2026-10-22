@@ -115,7 +115,7 @@ function DashboardView({ dashboard, refreshing, onRefresh, onManage, onAdd }: { 
   const groups: { title: string; relevance: Relevance; description: string }[] = [
     { title: 'Direct asset news', relevance: 'Direct asset news', description: 'News that directly concerns your followed assets.' },
     { title: 'Industry news', relevance: 'Industry news', description: 'Developments connected to your followed industries.' },
-    { title: 'Broader market context', relevance: 'Market context', description: 'Events that may be relevant to the wider market.' },
+    { title: 'Market context', relevance: 'Market context', description: 'Broader economic, policy, and market developments.' },
   ]
   if (!dashboard.assets.length) return <FirstUseDashboard onAdd={onAdd} />
   return <section className="page dashboard-page">
@@ -171,7 +171,7 @@ function AssetCard({ asset, onManage }: { asset: Asset; onManage: () => void }) 
 }
 
 function NewsGroup({ title, description, articles }: { title: string; description: string; articles: Dashboard['articles'] }) {
-  const empty = title === 'Industry news' ? 'No relevant industry news is stored for your followed industries yet.' : 'No relevant news is stored here yet.'
+  const empty = title === 'Industry news' ? 'No relevant industry news is stored for your followed industries yet.' : title === 'Market context' ? 'No broader market context is stored yet.' : 'No relevant news is stored here yet.'
   return <section className="news-group"><div className="news-title"><h3>{title}</h3><p>{description}</p></div>{articles.length ? <div className="article-stack">{articles.map((article) => <ArticleCard key={article.id} article={article} />)}</div> : <p className="empty-copy">{empty}</p>}</section>
 }
 

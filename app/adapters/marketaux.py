@@ -8,7 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from app.providers import NewsArticle
+from app.providers import NewsArticle, PartialNewsProviderError
 
 
 class MarketauxProvider:
@@ -74,11 +74,16 @@ class MarketauxProvider:
             try:
                 with urlopen(request, timeout=self.timeout) as response:
                     payload = json.loads(response.read().decode("utf-8"))
-            except (HTTPError, URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+            except (HTTPError, URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
                 # The refresh workflow treats this as an individual news-source failure.
+                if articles:
+                    raise PartialNewsProviderError("A Marketaux query failed after partial results.", articles) from error
                 raise
             if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
-                raise ValueError("Marketaux returned an invalid news response.")
+                error = ValueError("Marketaux returned an invalid news response.")
+                if articles:
+                    raise PartialNewsProviderError(str(error), articles) from error
+                raise error
             for item in payload["data"][: self.max_results]:
                 article = self._article(item, symbols)
                 if article is None:
@@ -88,6 +93,31 @@ class MarketauxProvider:
                     seen.add(identity)
                     articles.append(article)
         return articles
+
+    def fetch_market_context(self, since: datetime | None, tickers: list[str] | None = None) -> list[NewsArticle]:
+        """Fetch one small, incremental batch for deterministic context matching."""
+        if not self.api_key:
+            return []
+        params: dict[str, str] = {
+            "api_token": self.api_key,
+            "limit": str(self.max_results),
+            "language": "en",
+            "countries": "global",
+        }
+        if since is not None:
+            if since.tzinfo is None:
+                since = since.replace(tzinfo=UTC)
+            params["published_after"] = since.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+        request = Request(
+            f"{self.endpoint}?{urlencode(params)}",
+            headers={"Accept": "application/json", "User-Agent": self.user_agent},
+        )
+        with urlopen(request, timeout=self.timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+            raise ValueError("Marketaux returned an invalid market-context response.")
+        symbols = list(dict.fromkeys(ticker.strip().upper() for ticker in (tickers or []) if ticker.strip()))
+        return [article for item in payload["data"][: self.max_results] if (article := self._article(item, symbols)) is not None]
 
     @staticmethod
     def _article(item: Any, requested_symbols: list[str]) -> NewsArticle | None:

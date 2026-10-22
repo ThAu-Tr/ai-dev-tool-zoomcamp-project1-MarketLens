@@ -153,3 +153,31 @@ def test_marketaux_returns_industry_only_articles_from_separate_query(monkeypatc
     assert len(articles) == 1
     assert articles[0].identifiers == []
     assert articles[0].industry_identifiers == ["Technology"]
+
+
+def test_marketaux_market_context_query_is_one_bounded_incremental_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    requests = []
+
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): return None
+        def read(self):
+            return json.dumps({"data": [
+                {"uuid": "macro-1", "title": "Inflation eases", "source": "Wire", "published_at": "2026-10-21T10:00:00Z", "url": "https://news.test/inflation", "snippet": "Prices rose more slowly."},
+                {"source": "Wire", "published_at": "2026-10-21T10:00:00Z", "url": "https://news.test/malformed"},
+            ]}).encode()
+
+    def fake_urlopen(request, timeout):
+        requests.append(request)
+        return Response()
+
+    monkeypatch.setattr("app.adapters.marketaux.urlopen", fake_urlopen)
+    since = datetime(2026, 10, 20, 9, tzinfo=UTC)
+    articles = MarketauxProvider(api_key="key").fetch_market_context(since, ["SAP"])
+
+    assert len(requests) == 1
+    params = parse_qs(urlparse(requests[0].full_url).query)
+    assert params["limit"] == ["3"]
+    assert params["published_after"] == ["2026-10-20T09:00:00Z"]
+    assert params["countries"] == ["global"]
+    assert [article.headline for article in articles] == ["Inflation eases"]

@@ -27,6 +27,9 @@ class ProviderGatewayComposition:
     def fetch_news(self, tickers, since, industries=None):
         return self.news_provider.fetch_news(tickers, since, industries)
 
+    def fetch_market_context(self, since, tickers=None):
+        return self.news_provider.fetch_market_context(since, tickers)
+
     def generate_context(self) -> None:
         return None
 

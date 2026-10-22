@@ -37,6 +37,10 @@ class RefreshRepository:
         state = self.session.get(RefreshState, user_id)
         return state.news_checked_at if state else None
 
+    def market_context_checked_at(self, user_id: int) -> datetime | None:
+        state = self.session.get(RefreshState, user_id)
+        return state.market_context_checked_at if state else None
+
     def mark_news_status(self, user_id: int, status: str) -> None:
         state = self.session.get(RefreshState, user_id)
         if state is None:
@@ -50,6 +54,13 @@ class RefreshRepository:
             state = RefreshState(user_id=user_id)
             self.session.add(state)
         state.news_checked_at = checked_at
+
+    def mark_market_context_checked_at(self, user_id: int, checked_at: datetime) -> None:
+        state = self.session.get(RefreshState, user_id)
+        if state is None:
+            state = RefreshState(user_id=user_id)
+            self.session.add(state)
+        state.market_context_checked_at = checked_at
 
     def save_direct_article(self, user_id: int, article: NewsArticle, article_id: str, url: str, tickers: list[str]) -> None:
         existing = self.session.scalar(select(Article).where(Article.user_id == user_id, (Article.id == article_id) | (Article.url == url)))
@@ -69,6 +80,14 @@ class RefreshRepository:
                 existing.industries = sorted(set(existing.industries).union(industry_ids))
             return
         self.session.add(Article(id=article_id, user_id=user_id, headline=article.headline, source=article.source, published_at=article.published_at, relevance="Industry news", assets=[], industries=sorted(set(industry_ids)), snippet=article.snippet, url=url))
+
+    def save_market_context_article(self, user_id: int, article: NewsArticle, article_id: str, url: str) -> None:
+        existing = self.session.scalar(select(Article).where(Article.user_id == user_id, (Article.id == article_id) | (Article.url == url)))
+        if existing is not None:
+            # Higher priority classifications always win, and a context article
+            # already stored under the canonical URL is never duplicated.
+            return
+        self.session.add(Article(id=article_id, user_id=user_id, headline=article.headline, source=article.source, published_at=article.published_at, relevance="Market context", assets=[], industries=[], snippet=article.snippet, url=url))
 
     def mark_unavailable(self, user_id: int, tickers: list[str]) -> None:
         state = self.session.get(RefreshState, user_id)

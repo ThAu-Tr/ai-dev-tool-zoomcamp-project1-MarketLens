@@ -95,6 +95,7 @@ class RefreshState(Base):
     unavailable_tickers: Mapped[list[str]] = mapped_column(JSON, default=list)
     news_status: Mapped[str] = mapped_column(String(16), default="current")
     news_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    market_context_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class HistoricalDay(Base):
