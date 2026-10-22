@@ -6,28 +6,17 @@ This document contains a small number of representative examples showing how AI 
 
 Do not document every prompt or every issue. Aim for approximately 4–6 useful examples across the full project.
 
-## Codex Model & Usage Comparison
-
-| Issues | Model | Reasoning effort | 5-hour usage | Notes |
-| --- | --- | --- | --- | --- |
-| #6, #7 | Terra | Medium | 86% | Combined session; included PM, engineering, and QA |
-| #8 | Luna | Medium | 8% | Engineering and QA |
-| #5, #9 | Luna | Medium | 25% | Combined parallel implementation; engineering and QA |
-
-Usage percentages reflect the reported share of the five-hour Codex allowance for each session, **not per-issue costs or measured token counts**. Tasks differed in complexity, and the Terra session also included PM work, so the figures are not a controlled model benchmark.
-
----
-
 ---
 
 ## Codex Model & Usage Comparison
 
 | Issues | Model | Reasoning effort | 5-hour usage | Notes |
 | --- | --- | --- | --- | --- |
-| #6, #7 | Terra | Medium | 86% | Combined session; included PM, engineering, and QA |
-| #8 | Luna | Medium | 8% | Engineering and QA |
-| #5, #9 | Luna | Medium | 25% | Combined parallel implementation; engineering and QA |
-| #4 | Terra | Medium | 10% | Additional session to complete #4; both #4 and #10 now closed |
+| #6, #7 | GPT-5.6 Terra | Medium | 86% | Combined session; included PM, engineering, and QA |
+| #8 | GPT-5,6 Luna | Medium | 8% | Engineering and QA |
+| #5, #9 | GPT-5.6 Luna | Medium | 25% | Combined parallel implementation; engineering and QA |
+| #4 | GPT-5.6 Terra | Medium | 10% | Additional session to complete #4; both #4 and #10 now closed |
+| #11, #14 | GPT-6 Luna | Medium | 15% | Parallel implementation, engineering and QA |
 
 Usage percentages reflect the reported share of the five-hour Codex allowance for each session, **not per-issue costs or measured token counts**. Tasks differed in complexity, and the Terra session also included PM work, so the figures are not a controlled model benchmark.
 
