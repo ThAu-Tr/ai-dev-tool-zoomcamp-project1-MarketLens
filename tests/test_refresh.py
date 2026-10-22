@@ -153,7 +153,7 @@ def test_market_context_matches_explicit_macro_events_and_omits_irrelevant_items
 
     assert response.status_code == 200
     with session_factory() as session:
-        articles = list(session.query(Article))
+        articles = list(session.query(Article).filter(Article.relevance != "Unclassified"))
         assert [(article.headline, article.relevance, article.assets, article.industries, article.snippet) for article in articles] == [
             ("Central bank holds interest rates steady", "Market context", [], [], "Source supplied context.")
         ]

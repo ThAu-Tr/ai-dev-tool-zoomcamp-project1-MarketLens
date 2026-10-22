@@ -227,11 +227,14 @@ def test_ai_failure_does_not_break_successful_price_news_refresh(session_factory
     from tests.test_direct_news import FakeNewsProvider, news
     seed_asset(session_factory)
     provider = FakeNewsProvider([news("SAP expands cloud services", ["SAP"])])
+    calls = []
     def fail(task, facts):
+        calls.append(task)
         raise RuntimeError("provider token=secret-body")
     provider.generate_context = fail
     response = build_client(session_factory, provider).post("/api/refresh")
     assert response.status_code == 200
+    assert calls == ["summarize"]
     assert "secret" not in response.text + caplog.text
     with session_factory() as session:
         assert session.get(Asset, "sap").price == Decimal("101.000000")
@@ -301,3 +304,49 @@ def test_adapter_rejects_malformed_incomplete_or_refusal(monkeypatch, payload):
     monkeypatch.setattr("app.adapters.openai.urlopen", lambda *a, **k: Response(payload))
     with pytest.raises(AIUnavailableError):
         OpenAIProvider(api_key="fake-key").generate_context("summarize", {})
+
+
+def test_fallback_has_bounded_input_and_no_unsupported_direct_cross_asset_links(session_factory):
+    prepare(session_factory, *[article(f"story-{i}", category="Unclassified", assets=[]) for i in range(8)])
+    provider = FakeAI(classifications=[classification("story-0")], summaries=[{"asset_id": "sap", "article_ids": ["story-0"]}])
+    run(session_factory, provider)
+    assert len(provider.calls[0][1]["articles"]) == 5
+    assert len(provider.calls) <= 2
+    with session_factory() as session:
+        assert session.query(Article).count() == 8
+
+
+def test_deterministic_promotions_keep_direct_industry_market_precedence(session_factory):
+    from app.providers import NewsArticle
+    from app.repositories.refresh import RefreshRepository
+    prepare(session_factory, article(category="Market context", assets=[]))
+    source = NewsArticle("SAP expands cloud services", "Stored Wire", NOW, "https://news.test/report", [])
+    with session_factory.begin() as session:
+        repo = RefreshRepository(session)
+        repo.save_industry_article(1, source, "report", source.url, ["software"])
+        assert session.get(Article, "report").relevance == "Industry news"
+        repo.save_market_context_article(1, source, "report", source.url)
+        assert session.get(Article, "report").relevance == "Industry news"
+        repo.save_direct_article(1, source, "report", source.url, ["SAP"])
+        repo.save_industry_article(1, source, "report", source.url, ["software"])
+        assert session.get(Article, "report").relevance == "Direct asset news"
+        assert session.get(Article, "report").industries == []
+        assert session.query(Article).count() == 1
+
+
+def test_ai_checkpoint_migration_preserves_existing_data(tmp_path, monkeypatch):
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, inspect, text
+    url = "sqlite:///" + (tmp_path / "migration.db").as_posix()
+    monkeypatch.setenv("DATABASE_URL", url)
+    config = Config("alembic.ini")
+    command.upgrade(config, "20261022_08")
+    engine = create_engine(url)
+    with engine.begin() as connection:
+        before = list(connection.execute(text("SELECT * FROM demo_users")))
+    command.upgrade(config, "head")
+    with engine.connect() as connection:
+        assert list(connection.execute(text("SELECT * FROM demo_users"))) == before
+    assert "ai_checked_at" in {column["name"] for column in inspect(engine).get_columns("refresh_states")}
+    engine.dispose()
