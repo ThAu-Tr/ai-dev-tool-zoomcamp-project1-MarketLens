@@ -49,7 +49,7 @@ def test_refresh_saves_only_explicit_direct_matches_deduplicates_and_links_all_a
 
     assert response.status_code == 200
     with session_factory() as session:
-        articles = session.query(Article).all()
+        articles = session.query(Article).filter(Article.relevance == "Direct asset news").all()
         assert len(articles) == 1
         assert articles[0].assets == ["ASML", "SAP"]
         assert articles[0].url == "https://news.example/direct"
@@ -58,7 +58,8 @@ def test_refresh_saves_only_explicit_direct_matches_deduplicates_and_links_all_a
     repeated = build_client(session_factory, provider).post("/api/refresh")
     assert repeated.status_code == 200
     with session_factory() as session:
-        assert session.query(Article).count() == 1
+        assert session.query(Article).filter(Article.relevance == "Direct asset news").count() == 1
+        assert session.query(Article).filter(Article.relevance == "Unclassified").count() == 2
         assert session.get(RefreshState, 1).news_status == "current"
     assert provider.news_calls[1][1] > datetime(2026, 10, 21, 9)
 
@@ -102,7 +103,7 @@ def test_refresh_saves_only_followed_industry_matches_and_direct_news_takes_prec
     response = build_client(session_factory, provider).post("/api/refresh")
     assert response.status_code == 200
     with session_factory() as session:
-        articles = session.query(Article).order_by(Article.url).all()
+        articles = session.query(Article).filter(Article.relevance != "Unclassified").order_by(Article.url).all()
         assert [(article.url, article.relevance, article.industries, article.assets) for article in articles] == [
             ("https://news.example/direct-sector", "Direct asset news", [], ["ASML"]),
             ("https://news.example/multi", "Industry news", ["semi", "software"], []),
@@ -114,7 +115,7 @@ def test_refresh_saves_only_followed_industry_matches_and_direct_news_takes_prec
 
     build_client(session_factory, provider).post("/api/refresh")
     with session_factory() as session:
-        assert session.query(Article).count() == 2
+        assert session.query(Article).filter(Article.relevance != "Unclassified").count() == 2
 
 
 def test_refresh_does_not_infer_industry_relevance_from_unfollowed_or_uncertain_text(session_factory):
@@ -129,7 +130,7 @@ def test_refresh_does_not_infer_industry_relevance_from_unfollowed_or_uncertain_
     response = build_client(session_factory, provider).post("/api/refresh")
     assert response.status_code == 200
     with session_factory() as session:
-        assert session.query(Article).count() == 0
+        assert session.query(Article).filter(Article.relevance != "Unclassified").count() == 0
 
 
 def test_refresh_uses_explicit_marketaux_industry_metadata_for_followed_industries(session_factory):
@@ -159,14 +160,14 @@ def test_refresh_passes_followed_industries_and_advances_checkpoint_for_irreleva
     with session_factory() as session:
         first_checkpoint = session.get(RefreshState, 1).news_checked_at
         assert first_checkpoint is not None
-        assert session.query(Article).count() == 0
+        assert session.query(Article).filter(Article.relevance != "Unclassified").count() == 0
     assert provider.news_calls[0][2] == ["Enterprise software"]
 
     assert build_client(session_factory, provider).post("/api/refresh").status_code == 200
     assert provider.news_calls[1][1] == first_checkpoint
     with session_factory() as session:
         assert session.get(RefreshState, 1).news_checked_at >= first_checkpoint
-        assert session.query(Article).count() == 0
+        assert session.query(Article).filter(Article.relevance != "Unclassified").count() == 0
 
 
 def test_marketaux_parent_industry_filter_is_not_proof_of_followed_industry_relevance(session_factory):
@@ -181,4 +182,4 @@ def test_marketaux_parent_industry_filter_is_not_proof_of_followed_industry_rele
     response = build_client(session_factory, FakeNewsProvider([broad_category_only])).post("/api/refresh")
     assert response.status_code == 200
     with session_factory() as session:
-        assert session.query(Article).count() == 0
+        assert session.query(Article).filter(Article.relevance != "Unclassified").count() == 0

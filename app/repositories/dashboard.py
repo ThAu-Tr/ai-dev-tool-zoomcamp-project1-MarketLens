@@ -21,7 +21,7 @@ class DashboardRepository:
         )
 
     def articles_for(self, user_id: int) -> list[Article]:
-        return list(self.session.scalars(select(Article).where(Article.user_id == user_id).order_by(Article.published_at.desc())))
+        return list(self.session.scalars(select(Article).where(Article.user_id == user_id, Article.relevance.in_(["Direct asset news", "Industry news", "Market context"])).order_by(Article.published_at.desc())))
 
     def industry_names(self, industry_ids: list[str]) -> dict[str, str]:
         if not industry_ids:

@@ -76,7 +76,11 @@ class RefreshRepository:
         if existing is not None:
             # A previously direct article keeps direct-news precedence. Other
             # industry links are unioned when a later refresh finds more matches.
-            if existing.relevance == "Industry news":
+            if existing.relevance in ("Market context", "Unclassified", "Not Relevant"):
+                existing.relevance = "Industry news"
+                existing.assets = []
+                existing.industries = sorted(set(industry_ids))
+            elif existing.relevance == "Industry news":
                 existing.industries = sorted(set(existing.industries).union(industry_ids))
             return
         self.session.add(Article(id=article_id, user_id=user_id, headline=article.headline, source=article.source, published_at=article.published_at, relevance="Industry news", assets=[], industries=sorted(set(industry_ids)), snippet=article.snippet, url=url))
@@ -84,10 +88,19 @@ class RefreshRepository:
     def save_market_context_article(self, user_id: int, article: NewsArticle, article_id: str, url: str) -> None:
         existing = self.session.scalar(select(Article).where(Article.user_id == user_id, (Article.id == article_id) | (Article.url == url)))
         if existing is not None:
+            if existing.relevance in ("Unclassified", "Not Relevant"):
+                existing.relevance = "Market context"
             # Higher priority classifications always win, and a context article
             # already stored under the canonical URL is never duplicated.
             return
         self.session.add(Article(id=article_id, user_id=user_id, headline=article.headline, source=article.source, published_at=article.published_at, relevance="Market context", assets=[], industries=[], snippet=article.snippet, url=url))
+
+    def save_unclassified_article(self, user_id: int, article: NewsArticle, article_id: str, url: str) -> None:
+        existing = self.session.scalar(select(Article).where(Article.user_id == user_id, (Article.id == article_id) | (Article.url == url)))
+        if existing is None:
+            self.session.add(Article(id=article_id, user_id=user_id, headline=article.headline, source=article.source,
+                                    published_at=article.published_at, relevance="Unclassified", assets=[], industries=[],
+                                    snippet=article.snippet, url=url))
 
     def mark_unavailable(self, user_id: int, tickers: list[str]) -> None:
         state = self.session.get(RefreshState, user_id)

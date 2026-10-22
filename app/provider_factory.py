@@ -8,15 +8,17 @@ from __future__ import annotations
 import os
 
 from app.adapters.marketaux import MarketauxProvider
+from app.adapters.openai import OpenAIProvider
 from app.provider_adapters.eodhd import EodhdMarketGateway
 
 
 class ProviderGatewayComposition:
     """Combine market and news providers behind the existing gateway seam."""
 
-    def __init__(self, market_provider: EodhdMarketGateway, news_provider: MarketauxProvider) -> None:
+    def __init__(self, market_provider: EodhdMarketGateway, news_provider: MarketauxProvider, ai_provider: OpenAIProvider | None = None) -> None:
         self.market_provider = market_provider
         self.news_provider = news_provider
+        self.ai_provider = ai_provider or OpenAIProvider()
 
     def fetch_market_data(self, tickers, since):
         return self.market_provider.fetch_market_data(tickers, since)
@@ -30,8 +32,12 @@ class ProviderGatewayComposition:
     def fetch_market_context(self, since, tickers=None):
         return self.news_provider.fetch_market_context(since, tickers)
 
-    def generate_context(self) -> None:
-        return None
+    @property
+    def ai_available(self) -> bool:
+        return self.ai_provider.available
+
+    def generate_context(self, task: str, evidence: dict) -> dict:
+        return self.ai_provider.generate_context(task, evidence)
 
 
 def create_default_provider_gateway():

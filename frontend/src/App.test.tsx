@@ -61,6 +61,24 @@ const localDateLabel = (isoDate: string) => new Intl.DateTimeFormat('en-US', { w
 describe('dashboard', () => {
   beforeEach(() => { vi.resetAllMocks(); setIndustryFollowed.mockResolvedValue({ id: 'industry', name: 'Industry', followed: false }); searchAssets.mockResolvedValue([]); getIndustries.mockResolvedValue([]); removeAsset.mockResolvedValue(); saveLots.mockResolvedValue(populatedDashboard.assets[0]); saveStatus.mockResolvedValue(populatedDashboard.assets[0]); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
 
+  it('renders AI context with movement, persisted source links and the exact disclaimer', async () => {
+    getDashboard.mockResolvedValue(populatedDashboard)
+    render(<App />)
+    const label = await screen.findByText('AI-generated context')
+    const card = label.closest('article')!
+    expect(within(card).getByText('Down -2.30%')).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'Market Wire ↗' })).toHaveAttribute('href', 'https://example.test/sap')
+    expect(screen.getByText('AI-generated market context may be incomplete or incorrect. Verify important conclusions using the linked sources.')).toBeInTheDocument()
+  })
+
+  it('keeps the dashboard usable with no stored AI summary', async () => {
+    getDashboard.mockResolvedValue({ ...populatedDashboard, summaries: [] })
+    render(<App />)
+    expect(await screen.findByText('No AI context is stored yet.')).toBeInTheDocument()
+    expect(screen.queryByText('AI-generated context')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled()
+  })
+
   it('loads the selected historical date through the timeline API and exposes retryable errors', async () => {
     getDashboard.mockResolvedValue(populatedDashboard)
     let finishInitialLoad!: (day: TimelineDay) => void

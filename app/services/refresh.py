@@ -87,6 +87,14 @@ class RefreshService:
         # News availability is intentionally independent of price availability:
         # a failed news call must not roll back successful quote persistence.
         self._refresh_news(user.id, assets)
+        # AI is a tightly scoped subsequent step over committed stored evidence.
+        # Its unavailable/invalid result never undoes successful price/news writes.
+        from app.repositories.context import ContextRepository
+        from app.services.context import ContextService
+        try:
+            ContextService(ContextRepository(self.repository.session), self.provider).refresh(user.id)
+        except Exception:
+            self.repository.session.rollback()
         return RefreshResponse(lastRefreshedAt=refreshed_at)
 
     def _refresh_news(self, user_id: int, assets: list[object]) -> None:
@@ -132,6 +140,8 @@ class RefreshService:
                 self.repository.save_industry_article(user_id, article, article_id, url, matched)
             elif _is_market_wide_context(article):
                 self.repository.save_market_context_article(user_id, article, article_id, url)
+            else:
+                self.repository.save_unclassified_article(user_id, article, article_id, url)
         fetch_market_context = getattr(self.provider, "fetch_market_context", None)
         context_checked_at = self.repository.market_context_checked_at(user_id)
         if callable(fetch_market_context) and (
@@ -160,6 +170,8 @@ class RefreshService:
                     self.repository.save_industry_article(user_id, article, article_id, url, matched)
                 elif _is_market_wide_context(article):
                     self.repository.save_market_context_article(user_id, article, article_id, url)
+                else:
+                    self.repository.save_unclassified_article(user_id, article, article_id, url)
         self.repository.mark_news_status(user_id, "stale" if malformed else "current")
         if not malformed:
             self.repository.mark_news_checked_at(user_id, query_started_at)

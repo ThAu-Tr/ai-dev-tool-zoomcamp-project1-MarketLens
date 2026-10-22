@@ -96,6 +96,7 @@ class RefreshState(Base):
     news_status: Mapped[str] = mapped_column(String(16), default="current")
     news_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     market_context_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ai_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class HistoricalDay(Base):
