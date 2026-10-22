@@ -8,6 +8,7 @@ import { industryApi } from './api/industryApi'
 import { assetRemoveApi } from './api/assetRemoveApi'
 import { replaceLots } from './api/lotsApi'
 import { updateAsset } from './api/assetUpdateApi'
+import { timelineApi } from './api/timelineApi'
 import type { Dashboard } from './types'
 
 vi.mock('./api/dashboardApi', () => ({
@@ -31,6 +32,7 @@ vi.mock('./api/assetRemoveApi', () => ({
 }))
 vi.mock('./api/lotsApi', () => ({ replaceLots: vi.fn() }))
 vi.mock('./api/assetUpdateApi', () => ({ updateAsset: vi.fn() }))
+vi.mock('./api/timelineApi', () => ({ timelineApi: { getDay: vi.fn() } }))
 
 const getDashboard = vi.mocked(dashboardApi.getDashboard)
 const searchAssets = vi.mocked(assetSearchApi.searchAssets)
@@ -40,6 +42,7 @@ const setIndustryFollowed = vi.mocked(industryApi.setFollowed)
 const removeAsset = vi.mocked(assetRemoveApi.removeAsset)
 const saveLots = vi.mocked(replaceLots)
 const saveStatus = vi.mocked(updateAsset)
+const getTimelineDay = vi.mocked(timelineApi.getDay)
 
 const populatedDashboard: Dashboard = {
   assets: [{ id: 'sap', name: 'SAP SE', ticker: 'SAP', exchange: 'XETRA', type: 'Stock', status: 'Owned', price: 210.35, currency: 'EUR', changePercent: -2.3, asOf: '2026-10-20T09:45:00Z', lots: [{ id: 'sap-1', quantity: '5', purchasePrice: '130.00' }, { id: 'sap-2', quantity: '3', purchasePrice: '150.00' }], industries: ['Enterprise software'] }],
@@ -50,6 +53,22 @@ const populatedDashboard: Dashboard = {
 
 describe('dashboard', () => {
   beforeEach(() => { vi.resetAllMocks(); setIndustryFollowed.mockResolvedValue({ id: 'industry', name: 'Industry', followed: false }); searchAssets.mockResolvedValue([]); getIndustries.mockResolvedValue([]); removeAsset.mockResolvedValue(); saveLots.mockResolvedValue(populatedDashboard.assets[0]); saveStatus.mockResolvedValue(populatedDashboard.assets[0]); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
+
+  it('loads the selected historical date through the timeline API and exposes retryable errors', async () => {
+    getDashboard.mockResolvedValue(populatedDashboard)
+    getTimelineDay.mockResolvedValue({ date: '2026-10-21', source: 'newly-loaded', assets: [{ ...populatedDashboard.assets[0], price: 201.25, changePercent: -1.2 }], articles: [], summaries: [] })
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Timeline' }))
+    await waitFor(() => expect(getTimelineDay).toHaveBeenCalled())
+    expect(await screen.findByText('Newly retrieved')).toBeInTheDocument()
+    expect(screen.getByText('201.25 EUR')).toBeInTheDocument()
+    getTimelineDay.mockRejectedValueOnce(new Error('Historical market data is currently unavailable.'))
+    fireEvent.click(screen.getAllByRole('button', { name: /Load/ })[0])
+    expect(await screen.findByText('Could not load this date')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Historical market data is currently unavailable.')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(getTimelineDay).toHaveBeenCalledTimes(3))
+  })
 
   it('separates followed and available industries, and moves an industry after a successful save', async () => {
     getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })

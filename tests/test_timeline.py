@@ -51,12 +51,14 @@ def test_first_request_persists_historical_quotes_without_changing_live_quotes()
 
 def test_archive_read_skips_provider_and_is_allowed_after_window():
     factory = make_factory()
-    provider = HistoryProvider([MarketQuote("SAP", Decimal("100"), "EUR", None, datetime(2026, 9, 1, tzinfo=UTC))])
+    provider = HistoryProvider([])
+    with factory.begin() as session:
+        session.add(HistoricalDay(user_id=1, market_date=date(2026, 9, 1), market_closed=False))
+        session.add(HistoricalPrice(id="archived-sap", user_id=1, market_date=date(2026, 9, 1), asset_id="sap", ticker="SAP", name="SAP SE", exchange="XETRA", asset_type="Stock", status="Owned", price=Decimal("100"), currency="EUR", change_percent=None, as_of=datetime(2026, 9, 1, tzinfo=UTC), industries=[]))
     client = build_client(factory, provider)
-    assert client.get("/api/timeline?date=2026-09-01").status_code == 200
     response = client.get("/api/timeline?date=2026-09-01")
     assert response.status_code == 200 and response.json()["source"] == "archive"
-    assert len(provider.calls) == 1
+    assert len(provider.calls) == 0
 
 
 def test_invalid_future_and_outside_window_rejected_without_provider_calls():
