@@ -101,6 +101,9 @@ The current backend suite covers the completed dashboard, catalogue-search, and 
 
 ## Local development and configuration
 
+**Course assignment / peer review:** MarketLens is a non-commercial educational project. Reviewers who run the app locally create their own EODHD and Marketaux accounts and supply their own API keys in a local `.env` file (copy variable names from `.env.example`). API keys are never included in the repository, and the frontend must not expose them. Provider usage is subject to each reviewer's own account limits and terms.
+
+
 The backend requires `DATABASE_URL`; it is intentionally not hard-coded. Alembic reads the same variable when applying migrations.
 
 ```powershell
