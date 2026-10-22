@@ -78,6 +78,13 @@ class EodhdMarketGateway:
                 continue
             try:
                 rows = self._get(f"eod/{symbol}", {"from": market_date.isoformat(), "to": market_date.isoformat(), "period": "d"})
+                if not isinstance(rows, list) or any(
+                    isinstance(row, dict) and ("error" in row or "errors" in row)
+                    for row in rows
+                ):
+                    # EODHD may return an HTTP-success JSON error payload. Only
+                    # an empty array represents a confirmed no-observation day.
+                    raise EodhdError("The market-data provider returned an invalid historical response.")
                 row = self._row_for_date(rows, market_date)
                 if row is None:
                     continue

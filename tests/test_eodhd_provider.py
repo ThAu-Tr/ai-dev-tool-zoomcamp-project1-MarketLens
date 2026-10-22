@@ -96,6 +96,16 @@ def test_missing_historical_rows_identify_partial_coverage_or_closed_day():
     assert closed.market_closed is True and closed.unavailable_tickers == []
 
 
+def test_historical_json_error_payload_is_unavailable_not_market_closed():
+    gateway = EodhdMarketGateway("secret", opener=fake_opener([{"error": "rate limit exceeded"}], []))
+
+    result = gateway.fetch_historical_data(["ASML"], date(2026, 10, 20))
+
+    assert result.quotes == []
+    assert result.unavailable_tickers == ["ASML"]
+    assert result.market_closed is False
+
+
 def test_unsupported_symbols_and_provider_errors_are_explicit_and_redacted():
     seen = []
     gateway = EodhdMarketGateway("secret-key", opener=fake_opener([TimeoutError("secret-key leaked"), TimeoutError("secret-key leaked")], seen))
