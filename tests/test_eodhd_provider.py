@@ -117,8 +117,9 @@ def test_missing_key_is_reported_as_unavailable_without_http():
 
 def test_default_gateway_is_configured_from_environment(monkeypatch):
     monkeypatch.setenv("EODHD_API_KEY", "configured")
+    monkeypatch.delenv("MARKETAUX_API_KEY", raising=False)
     gateway = create_default_provider_gateway()
-    assert isinstance(gateway, EodhdMarketGateway)
+    assert isinstance(gateway.market_provider, EodhdMarketGateway)
 
     monkeypatch.delenv("EODHD_API_KEY")
     assert create_default_provider_gateway() is None
