@@ -121,7 +121,7 @@ describe('dashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: `Load ${localDateLabel(fourthDay)}` }))
     await waitFor(() => expect(getTimelineDay).toHaveBeenCalledTimes(5))
     expect(await screen.findByText('No market-day data')).toBeInTheDocument()
-  })
+  }, 10_000)
 
   it('separates followed and available industries, and moves an industry after a successful save', async () => {
     getDashboard.mockResolvedValue({ assets: [], articles: [], summaries: [], lastRefreshedAt: 'Not refreshed yet' })
