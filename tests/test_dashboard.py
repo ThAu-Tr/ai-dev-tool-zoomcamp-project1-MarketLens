@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import Base, get_session
 from app.main import create_app
-from app.models import Article, Asset, ContextSummary, DemoUser, PurchaseLot, RefreshState
+from app.models import Article, Asset, ContextSummary, DemoUser, Industry, IndustryFollow, PurchaseLot, RefreshState
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def test_dashboard_returns_persisted_populated_data_without_writing_or_provider_
         user = seed_demo_user(session)
         asset = Asset(id="sap", user_id=user.id, name="SAP SE", ticker="SAP", exchange="XETRA", asset_type="Stock", status="Owned", price=Decimal("210.35"), currency="EUR", change_percent=Decimal("-2.30"), as_of=refreshed_at, industries=["Enterprise software", "AI"])
         asset.lots = [PurchaseLot(id="sap-1", quantity=Decimal("5"), purchase_price=Decimal("130.00")), PurchaseLot(id="sap-2", quantity=Decimal("3"), purchase_price=Decimal("150.00"))]
-        session.add_all([asset, Article(id="asset-news", user_id=user.id, headline="SAP update", source="Market Wire", published_at=refreshed_at, relevance="Direct asset news", assets=["SAP"], industries=[], snippet="Stored asset news.", url="https://example.test/sap"), Article(id="industry-news", user_id=user.id, headline="Software update", source="Market Wire", published_at=refreshed_at, relevance="Industry news", assets=[], industries=["Enterprise software"], snippet="Stored industry news.", url="https://example.test/software"), Article(id="market-news", user_id=user.id, headline="Rates update", source="Market Wire", published_at=refreshed_at, relevance="Market context", assets=[], industries=[], snippet="Stored market context.", url="https://example.test/rates"), ContextSummary(id="summary-1", user_id=user.id, asset_id="sap", summary="Possible context only; verify linked reports.", article_ids=["asset-news"]), RefreshState(user_id=user.id, last_refreshed_at=refreshed_at)])
+        session.add_all([Industry(id="software", name="Enterprise software"), IndustryFollow(user_id=user.id, industry_id="software"), asset, Article(id="asset-news", user_id=user.id, headline="SAP update", source="Market Wire", published_at=refreshed_at, relevance="Direct asset news", assets=["SAP"], industries=[], snippet="Stored asset news.", url="https://example.test/sap"), Article(id="industry-news", user_id=user.id, headline="Software update", source="Market Wire", published_at=refreshed_at, relevance="Industry news", assets=[], industries=["software"], snippet="Stored industry news.", url="https://example.test/software"), Article(id="market-news", user_id=user.id, headline="Rates update", source="Market Wire", published_at=refreshed_at, relevance="Market context", assets=[], industries=[], snippet="Stored market context.", url="https://example.test/rates"), ContextSummary(id="summary-1", user_id=user.id, asset_id="sap", summary="Possible context only; verify linked reports.", article_ids=["asset-news"]), RefreshState(user_id=user.id, last_refreshed_at=refreshed_at)])
 
     response = client.get("/api/dashboard")
 
@@ -103,3 +103,45 @@ def test_dashboard_read_does_not_access_any_provider(session_factory: sessionmak
 
     assert response.status_code == 200
     assert provider_gateway.calls == []
+
+
+def test_dashboard_projects_persisted_articles_against_current_industry_follows(client: TestClient, session_factory: sessionmaker[Session]) -> None:
+    published_at = datetime(2026, 10, 20, 9, 45, tzinfo=UTC)
+    with session_factory.begin() as session:
+        user = seed_demo_user(session)
+        session.add_all([
+            Industry(id="semi", name="Semiconductors"),
+            Industry(id="software", name="Enterprise software"),
+            IndustryFollow(user_id=user.id, industry_id="semi"),
+            IndustryFollow(user_id=user.id, industry_id="software"),
+            Asset(id="sap", user_id=user.id, name="SAP SE", ticker="SAP", exchange="XETRA", asset_type="Stock", status="Owned", industries=[], lots=[]),
+            Article(id="semi-only", user_id=user.id, headline="Semi only", source="Wire", published_at=published_at, relevance="Industry news", assets=[], industries=["semi"], snippet=None, url="https://example.test/semi"),
+            Article(id="multi-industry", user_id=user.id, headline="Semi and software", source="Wire", published_at=published_at, relevance="Industry news", assets=[], industries=["semi", "software"], snippet=None, url="https://example.test/multi"),
+            Article(id="direct", user_id=user.id, headline="SAP and semis", source="Wire", published_at=published_at, relevance="Direct asset news", assets=["SAP"], industries=["semi"], snippet=None, url="https://example.test/direct"),
+            Article(id="market", user_id=user.id, headline="Rates", source="Wire", published_at=published_at, relevance="Market context", assets=[], industries=[], snippet=None, url="https://example.test/market"),
+            RefreshState(user_id=user.id, news_status="stale"),
+        ])
+
+    def article_ids() -> set[str]:
+        response = client.get("/api/dashboard")
+        assert response.status_code == 200
+        assert response.json()["newsStatus"] == "stale"
+        return {article["id"] for article in response.json()["articles"]}
+
+    assert article_ids() == {"semi-only", "multi-industry", "direct", "market"}
+
+    assert client.put("/api/industries/semi/follow", json={"followed": False}).status_code == 200
+    assert article_ids() == {"multi-industry", "direct", "market"}
+
+    # Following again reuses the stored row; it does not need a provider refresh.
+    assert client.put("/api/industries/semi/follow", json={"followed": True}).status_code == 200
+    assert article_ids() == {"semi-only", "multi-industry", "direct", "market"}
+
+    assert client.put("/api/industries/software/follow", json={"followed": False}).status_code == 200
+    # The multi-category article remains while its other industry is followed.
+    assert article_ids() == {"semi-only", "multi-industry", "direct", "market"}
+    assert client.put("/api/industries/semi/follow", json={"followed": False}).status_code == 200
+    assert article_ids() == {"direct", "market"}
+    with session_factory() as session:
+        assert session.query(Article).count() == 4
+        assert session.get(Article, "semi-only") is not None

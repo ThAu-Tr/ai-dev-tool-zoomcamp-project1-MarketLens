@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.db import Base, get_session
 from app.main import create_app
-from app.models import Article, Asset, ContextSummary, DemoUser, PurchaseLot
+from app.models import Article, Asset, ContextSummary, DemoUser, Industry, IndustryFollow, PurchaseLot
 
 
 def seed_demo_user(session: Session) -> DemoUser:
@@ -45,6 +45,10 @@ def test_delete_asset_removes_its_active_lots_and_context_only() -> None:
     client, session_factory = build_client()
     with session_factory.begin() as session:
         user = seed_demo_user(session)
+        session.add_all([
+            Industry(id="software", name="Software"),
+            IndustryFollow(user_id=user.id, industry_id="software"),
+        ])
         sap = _asset("sap", user.id, "SAP")
         sap.lots = [PurchaseLot(id="sap-lot", quantity=Decimal("2"), purchase_price=Decimal("90"))]
         asml = _asset("asml", user.id, "ASML")
@@ -55,7 +59,7 @@ def test_delete_asset_removes_its_active_lots_and_context_only() -> None:
             ContextSummary(id="asml-summary", user_id=user.id, asset_id="asml", summary="Possible ASML context.", article_ids=[]),
             Article(id="sap-only", user_id=user.id, headline="SAP", source="Test", published_at=datetime(2026, 10, 20, tzinfo=UTC), relevance="Direct asset news", assets=["SAP"], industries=[], snippet="Stored.", url="https://example.test/sap"),
             Article(id="shared", user_id=user.id, headline="Shared", source="Test", published_at=datetime(2026, 10, 20, tzinfo=UTC), relevance="Direct asset news", assets=["SAP", "ASML"], industries=[], snippet="Stored.", url="https://example.test/shared"),
-            Article(id="industry", user_id=user.id, headline="Industry", source="Test", published_at=datetime(2026, 10, 20, tzinfo=UTC), relevance="Industry news", assets=[], industries=["Software"], snippet="Stored.", url="https://example.test/industry"),
+            Article(id="industry", user_id=user.id, headline="Industry", source="Test", published_at=datetime(2026, 10, 20, tzinfo=UTC), relevance="Industry news", assets=[], industries=["software"], snippet="Stored.", url="https://example.test/industry"),
         ])
 
     response = client.delete("/api/assets/sap")
