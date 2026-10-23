@@ -37,7 +37,6 @@ export default function App() {
   const [error, setError] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
-  const [returnToDashboardAfterLotsSave, setReturnToDashboardAfterLotsSave] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -99,8 +98,8 @@ export default function App() {
       <main>
         {error && <div className="error-banner" role="alert"><span>!</span>{error}<button onClick={() => void load()}>Retry</button><button onClick={() => setError('')}>Dismiss</button></div>}
         {loading && !dashboard ? <LoadingScreen /> : dashboard && <>
-          {view === 'dashboard' && <DashboardView dashboard={dashboard} refreshing={refreshing} onRefresh={refresh} onManage={(asset) => { setSelectedAsset(asset); setReturnToDashboardAfterLotsSave(true); navigate('watchlist') }} onAdd={() => { setAddOpen(true); navigate('watchlist') }} />}
-          {view === 'watchlist' && <WatchlistView assets={dashboard.assets} industries={industries} industryError={industryError} initialAsset={selectedAsset} returnToDashboardAfterLotsSave={returnToDashboardAfterLotsSave} onReturnToDashboard={() => navigate('dashboard')} onSelect={(asset) => { setSelectedAsset(asset); setReturnToDashboardAfterLotsSave(false) }} onAdd={() => setAddOpen(true)} onChanged={onAssetSaved} onSetIndustryFollowed={setIndustryFollowed} />}
+          {view === 'dashboard' && <DashboardView dashboard={dashboard} refreshing={refreshing} onRefresh={refresh} onManage={(asset) => { setSelectedAsset(asset); navigate('watchlist') }} onAdd={() => { setAddOpen(true); navigate('watchlist') }} />}
+          {view === 'watchlist' && <WatchlistView assets={dashboard.assets} industries={industries} industryError={industryError} initialAsset={selectedAsset} onReturnToDashboard={() => navigate('dashboard')} onSelect={(asset) => setSelectedAsset(asset)} onAdd={() => setAddOpen(true)} onChanged={onAssetSaved} onSetIndustryFollowed={setIndustryFollowed} />}
           {view === 'timeline' && <TimelineView />}
         </>}
       </main>
@@ -180,7 +179,7 @@ function ArticleCard({ article }: { article: Dashboard['articles'][number] }) {
   return <a className="article-card" href={article.url} target="_blank" rel="noreferrer"><div><div className="article-meta"><span className={`dot ${article.relevance === 'Direct asset news' ? 'blue' : article.relevance === 'Industry news' ? 'amber' : 'violet'}`} />{article.source}<span>·</span>{article.publishedAt}</div><h4>{article.headline}</h4>{article.snippet && <p>{article.snippet}</p>}<div className="article-tags">{[...article.assets, ...article.industries].map((tag) => <span key={tag}>{tag}</span>)}</div></div><span className="external">↗</span></a>
 }
 
-function WatchlistView({ assets, industries, industryError, initialAsset, returnToDashboardAfterLotsSave, onReturnToDashboard, onSelect, onAdd, onChanged, onSetIndustryFollowed }: { assets: Asset[]; industries: Industry[]; industryError: string; initialAsset: Asset | null; returnToDashboardAfterLotsSave: boolean; onReturnToDashboard: () => void; onSelect: (asset: Asset) => void; onAdd: () => void; onChanged: () => Promise<void>; onSetIndustryFollowed: (id: string, followed: boolean) => Promise<void> }) {
+function WatchlistView({ assets, industries, industryError, initialAsset, onReturnToDashboard, onSelect, onAdd, onChanged, onSetIndustryFollowed }: { assets: Asset[]; industries: Industry[]; industryError: string; initialAsset: Asset | null; onReturnToDashboard: () => void; onSelect: (asset: Asset) => void; onAdd: () => void; onChanged: () => Promise<void>; onSetIndustryFollowed: (id: string, followed: boolean) => Promise<void> }) {
   const [tab, setTab] = useState<'assets' | 'industries'>('assets')
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Asset | null>(initialAsset)
@@ -190,7 +189,7 @@ function WatchlistView({ assets, industries, industryError, initialAsset, return
     <div className="eyebrow">YOUR MONITORING SETUP</div><div className="page-heading"><div><h1>Build a watchlist<br /><em>that stays meaningful.</em></h1><p>Keep assets and themes in one focused monitoring view.</p></div></div>
     <div className="tabbar"><button className={tab === 'assets' ? 'tab active' : 'tab'} onClick={() => setTab('assets')}>Assets <span>{assets.length}</span></button><button className={tab === 'industries' ? 'tab active' : 'tab'} onClick={() => setTab('industries')}>Industries <span>{industries.filter((item) => item.followed).length}</span></button></div>
     {tab === 'assets' ? <><div className="watchlist-toolbar"><label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search assets or tickers" /></label><button className="button primary" onClick={onAdd}>+ Add asset</button></div>{assets.length ? <div className="table-card"><div className="asset-table header-row"><span>Asset</span><span>Type</span><span>Status</span><span>Price</span><span>Industries</span><span /></div>{filtered.map((asset) => <div className="asset-table" key={asset.id}><div><strong>{asset.name}</strong><small>{asset.ticker} · {asset.exchange}</small></div><span>{asset.type}</span><span className={`chip ${asset.status === 'Owned' ? 'owned' : 'interested'}`}>{asset.status}</span><span>{asset.price === null ? 'Price not refreshed' : money(asset.price, asset.currency ?? 'USD')}</span><div className="mini-tags">{asset.industries.map((industry) => <span key={industry}>{industry}</span>)}</div><button className="text-button" onClick={() => { setEditing(asset); onSelect(asset) }}>Manage →</button></div>)}</div> : <p className="empty-copy">Your watchlist is empty. Add an asset to start monitoring.</p>}</> : <IndustryPanel industries={industries} error={industryError} onSetFollowed={onSetIndustryFollowed} />}
-    {editing && <LotsPanel asset={editing} onClose={() => setEditing(null)} onSaved={onChanged} onLotsSaved={async () => { await onChanged(); if (returnToDashboardAfterLotsSave) onReturnToDashboard() }} />}
+    {editing && <LotsPanel asset={editing} onClose={() => setEditing(null)} onSaved={onChanged} onLotsSaved={async () => { await onChanged(); onReturnToDashboard() }} />}
   </section>
 }
 

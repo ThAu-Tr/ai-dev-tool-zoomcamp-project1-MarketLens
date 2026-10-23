@@ -423,6 +423,23 @@ describe('dashboard', () => {
     expect(screen.getByText('Avg. €100.00')).toBeInTheDocument()
   })
 
+  it('returns to the dashboard with updated figures after editing from the Watchlist table', async () => {
+    const updated = { ...populatedDashboard, assets: [{ ...populatedDashboard.assets[0], lots: [{ id: 'sap-1', quantity: '10', purchasePrice: '100', purchaseDate: '2026-05-01' }] }] }
+    getDashboard.mockResolvedValueOnce(populatedDashboard).mockResolvedValueOnce(updated)
+    getIndustries.mockResolvedValue([])
+    saveLots.mockResolvedValue(updated.assets[0])
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Watchlist' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Manage →' }))
+    fireEvent.change(screen.getByLabelText('Lot 1 quantity'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('Lot 1 price'), { target: { value: '100' } })
+    fireEvent.change(screen.getByLabelText('Lot 1 purchase date'), { target: { value: '2026-05-01' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save lots' }))
+    expect(await screen.findByText('10 active shares')).toBeInTheDocument()
+    expect(screen.getByText('Avg. €100.00')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save lots' })).not.toBeInTheDocument()
+  })
+
   it('removes an individual lot and saves only the remaining lots', async () => {
     getDashboard.mockResolvedValue(populatedDashboard)
     render(<App />)
