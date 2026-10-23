@@ -399,16 +399,40 @@ describe('dashboard', () => {
     expect(screen.getByLabelText('Owned')).toBeChecked()
   })
 
-  it('adds, edits, and saves a purchase lot including its purchase date', async () => {
-    getDashboard.mockResolvedValue(populatedDashboard)
+  it('saves edited lots once, closes the editor, and shows refreshed figures on the dashboard', async () => {
+    const updated = { ...populatedDashboard, assets: [{ ...populatedDashboard.assets[0], lots: [{ id: 'sap-1', quantity: '10', purchasePrice: '100', purchaseDate: '2026-05-01' }] }] }
+    getDashboard.mockResolvedValueOnce(populatedDashboard).mockResolvedValueOnce(updated)
+    let resolveSave: (asset: typeof populatedDashboard.assets[number]) => void = () => {}
+    saveLots.mockReturnValueOnce(new Promise<typeof populatedDashboard.assets[number]>((resolve) => { resolveSave = resolve }))
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: /manage lots/i }))
     fireEvent.click(screen.getByRole('button', { name: /add lot/i }))
     fireEvent.change(screen.getByLabelText('Lot 3 quantity'), { target: { value: '2.5' } })
     fireEvent.change(screen.getByLabelText('Lot 3 price'), { target: { value: '99.10' } })
     fireEvent.change(screen.getByLabelText('Lot 3 purchase date'), { target: { value: '2026-05-01' } })
+    const saveButton = screen.getByRole('button', { name: 'Save lots' })
+    const lastDateField = screen.getByLabelText('Lot 3 purchase date')
+    expect(lastDateField.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    fireEvent.click(saveButton)
+    fireEvent.click(saveButton)
+    expect(saveLots).toHaveBeenCalledTimes(1)
+    expect(saveLots).toHaveBeenCalledWith('sap', expect.arrayContaining([expect.objectContaining({ quantity: '2.5', purchasePrice: '99.10', purchaseDate: '2026-05-01' })]))
+    resolveSave(updated.assets[0])
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save lots' })).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Dashboard' }))
+    expect(await screen.findByText('10 active shares')).toBeInTheDocument()
+    expect(screen.getByText('Avg. €100.00')).toBeInTheDocument()
+  })
+
+  it('shows actionable validation feedback for an invalid lot without submitting it', async () => {
+    getDashboard.mockResolvedValue(populatedDashboard)
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /manage lots/i }))
+    fireEvent.change(screen.getByLabelText('Lot 1 quantity'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save lots' }))
-    await waitFor(() => expect(saveLots).toHaveBeenCalledWith('sap', expect.arrayContaining([expect.objectContaining({ quantity: '2.5', purchasePrice: '99.10', purchaseDate: '2026-05-01' })])))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter a positive quantity and purchase price')
+    expect(screen.getByLabelText('Lot 1 quantity')).toHaveValue('')
+    expect(saveLots).not.toHaveBeenCalled()
   })
 
   it('keeps edited lot input and shows an actionable save error', async () => {
@@ -417,22 +441,45 @@ describe('dashboard', () => {
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: /manage lots/i }))
     fireEvent.change(screen.getByLabelText('Lot 1 quantity'), { target: { value: '7.125' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save lots' }))
+    fireEvent.change(screen.getByLabelText('Lot 1 purchase date'), { target: { value: '2026-06-01' } })
+    const saveButton = screen.getByRole('button', { name: 'Save lots' })
+    expect(screen.getByLabelText('Lot 1 purchase date').compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    fireEvent.click(saveButton)
     expect(await screen.findByRole('alert')).toHaveTextContent('Purchase date cannot be in the future.')
     expect(screen.getByLabelText('Lot 1 quantity')).toHaveValue('7.125')
+    expect(screen.getByLabelText('Lot 1 purchase date')).toHaveValue('2026-06-01')
   })
 
   it('changes an interested asset to owned with initial lots in one request', async () => {
     const interested = { ...populatedDashboard.assets[0], status: 'Interested' as const, lots: [] }
-    getDashboard.mockResolvedValueOnce({ ...populatedDashboard, assets: [interested] }).mockResolvedValueOnce({ ...populatedDashboard })
+    const updated = { ...populatedDashboard, assets: [{ ...interested, status: 'Owned' as const, lots: [{ id: 'lot-1', quantity: '2', purchasePrice: '100', purchaseDate: '2026-06-01' }] }] }
+    getDashboard.mockResolvedValueOnce({ ...populatedDashboard, assets: [interested] }).mockResolvedValueOnce(updated)
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: /manage asset/i }))
     fireEvent.click(screen.getByLabelText('Owned'))
     fireEvent.click(screen.getByRole('button', { name: /add lot/i }))
     fireEvent.change(screen.getByLabelText('Lot 1 quantity'), { target: { value: '2' } })
     fireEvent.change(screen.getByLabelText('Lot 1 price'), { target: { value: '100' } })
+    fireEvent.change(screen.getByLabelText('Lot 1 purchase date'), { target: { value: '2026-06-01' } })
+    const saveButton = screen.getByRole('button', { name: 'Save ownership status' })
+    expect(screen.getByLabelText('Lot 1 purchase date').compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    fireEvent.click(saveButton)
+    await waitFor(() => expect(saveStatus).toHaveBeenCalledWith('sap', { status: 'Owned', lots: [expect.objectContaining({ quantity: '2', purchasePrice: '100', purchaseDate: '2026-06-01' })] }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save ownership status' })).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Dashboard' }))
+    expect(await screen.findByText('2 active shares')).toBeInTheDocument()
+    expect(screen.getByText('Avg. €100.00')).toBeInTheDocument()
+  })
+
+  it('shows actionable validation feedback for an empty initial Owned lot', async () => {
+    getDashboard.mockResolvedValue({ ...populatedDashboard, assets: [{ ...populatedDashboard.assets[0], status: 'Interested', lots: [] }] })
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /manage asset/i }))
+    fireEvent.click(screen.getByLabelText('Owned'))
     fireEvent.click(screen.getByRole('button', { name: 'Save ownership status' }))
-    await waitFor(() => expect(saveStatus).toHaveBeenCalledWith('sap', { status: 'Owned', lots: [expect.objectContaining({ quantity: '2', purchasePrice: '100' })] }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Add at least one active purchase lot.')
+    expect(saveStatus).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Owned')).toBeChecked()
   })
 
   it('retains the requested status and initial-lot input when changing ownership fails', async () => {
@@ -445,10 +492,15 @@ describe('dashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: /add lot/i }))
     fireEvent.change(screen.getByLabelText('Lot 1 quantity'), { target: { value: '2' } })
     fireEvent.change(screen.getByLabelText('Lot 1 price'), { target: { value: '100' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save ownership status' }))
+    fireEvent.change(screen.getByLabelText('Lot 1 purchase date'), { target: { value: '2026-06-01' } })
+    const saveButton = screen.getByRole('button', { name: 'Save ownership status' })
+    expect(screen.getByLabelText('Lot 1 purchase date').compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    fireEvent.click(saveButton)
     expect(await screen.findByRole('alert')).toHaveTextContent('At least one active purchase lot')
     expect(screen.getByLabelText('Owned')).toBeChecked()
     expect(screen.getByLabelText('Lot 1 quantity')).toHaveValue('2')
+    expect(screen.getByLabelText('Lot 1 purchase date')).toHaveValue('2026-06-01')
+    expect(screen.getByRole('button', { name: 'Save ownership status' })).toBeInTheDocument()
   })
 
   it('confirms asset removal and leaves the watchlist unchanged when cancelled', async () => {

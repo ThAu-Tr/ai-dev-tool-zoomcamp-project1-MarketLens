@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { dashboardApi } from './api/dashboardApi'
 import { refreshApi } from './api/refreshApi'
 import { assetSearchApi } from './api/assetSearchApi'
@@ -202,18 +202,38 @@ function IndustryPanel({ industries, error, onSetFollowed }: { industries: Indus
 }
 
 function LotsPanel({ asset, onClose, onSaved }: { asset: Asset; onClose: () => void; onSaved: () => Promise<void> }) {
-  const [lots, setLots] = useState<Lot[]>(asset.lots); const [status, setStatus] = useState(asset.status); const [saving, setSaving] = useState(false); const [confirmingRemoval, setConfirmingRemoval] = useState(false); const [removeError, setRemoveError] = useState(''); const [saveError, setSaveError] = useState('')
+  const [lots, setLots] = useState<Lot[]>(asset.lots); const [status, setStatus] = useState(asset.status); const [saving, setSaving] = useState(false); const savingRef = useRef(false); const [confirmingRemoval, setConfirmingRemoval] = useState(false); const [removeError, setRemoveError] = useState(''); const [saveError, setSaveError] = useState('')
   const updateLot = (id: string, field: keyof Lot, value: string | null) => setLots((current) => current.map((lot) => lot.id === id ? { ...lot, [field]: value } : lot))
-  const valid = lots.length > 0 && lots.every((lot) => /^\d+(\.\d{1,6})?$/.test(lot.quantity) && /^\d+(\.\d{1,6})?$/.test(lot.purchasePrice) && decimalInt(lot.quantity) > 0n && decimalInt(lot.purchasePrice) > 0n && (!lot.purchaseDate || lot.purchaseDate <= new Date().toISOString().slice(0, 10)))
-  const save = async () => { if (!valid) return; setSaving(true); setSaveError(''); try { await replaceLots(asset.id, lots); await onSaved() } catch (error) { const message = error instanceof Error ? error.message : 'Unable to save lots. Your changes are still here.'; setSaveError(message) } finally { setSaving(false) } }
+  const lotValidationError = !lots.length
+    ? 'Add at least one active purchase lot.'
+    : lots.some((lot) => !/^\d+(\.\d{1,6})?$/.test(lot.quantity) || !/^\d+(\.\d{1,6})?$/.test(lot.purchasePrice) || decimalInt(lot.quantity) <= 0n || decimalInt(lot.purchasePrice) <= 0n)
+      ? 'Enter a positive quantity and purchase price with up to six decimal places for each lot.'
+      : lots.some((lot) => Boolean(lot.purchaseDate) && lot.purchaseDate! > new Date().toISOString().slice(0, 10))
+        ? 'Purchase dates cannot be in the future.'
+        : ''
+  const valid = !lotValidationError
+  const save = async () => {
+    if (savingRef.current) return
+    if (!valid) { setSaveError(lotValidationError); return }
+    savingRef.current = true; setSaving(true); setSaveError('')
+    try {
+      if (showInitialLots) await updateAsset(asset.id, { status: 'Owned', lots })
+      else await replaceLots(asset.id, lots)
+      await onSaved(); onClose()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to save lots. Your changes are still here.'
+      setSaveError(`${message} Your lot entries are still here; correct any invalid values or retry.`)
+    } finally { savingRef.current = false; setSaving(false) }
+  }
   const saveStatus = async () => {
-    if (asset.type === 'Index' || status === asset.status || (status === 'Owned' && asset.lots.length === 0 && !valid)) return
+    if (asset.type === 'Index' || status === asset.status || (status === 'Owned' && asset.lots.length === 0 && !valid) || savingRef.current) return
+    savingRef.current = true
     setSaving(true); setSaveError('')
     try {
       await updateAsset(asset.id, status === 'Owned' && asset.lots.length === 0 ? { status, lots } : { status })
       await onSaved(); onClose()
     } catch (error) { setSaveError(error instanceof Error ? error.message : 'Unable to save ownership status. Your selection is still here.') }
-    finally { setSaving(false) }
+    finally { savingRef.current = false; setSaving(false) }
   }
   const quantity = decimalSum(lots.map((lot) => lot.quantity || '0')); const average = weightedAverage(lots)
   const remove = async () => {
@@ -224,7 +244,7 @@ function LotsPanel({ asset, onClose, onSaved }: { asset: Asset; onClose: () => v
   }
   const showInitialLots = status === 'Owned' && asset.status === 'Interested' && asset.lots.length === 0
   const showEditableLots = status === 'Owned' && asset.status === 'Owned'
-  return <aside className="side-panel"><button className="close-button" onClick={onClose} aria-label="Close asset management">×</button><span className="section-kicker">MANAGE ASSET</span><h2>{asset.name}</h2><p className="muted">{asset.ticker} · {asset.exchange} · {asset.type}</p>{asset.type === 'Index' ? <p className="panel-note">Indices are followed for market context and cannot be marked as owned.</p> : <><fieldset><legend>Follow status</legend><label className="radio"><input type="radio" name="managed-status" checked={status === 'Interested'} onChange={() => { setStatus('Interested'); setSaveError('') }} /> Interested</label><label className="radio"><input type="radio" name="managed-status" checked={status === 'Owned'} onChange={() => { setStatus('Owned'); setSaveError('') }} /> Owned</label></fieldset>{status !== asset.status && <button className="button primary full" disabled={saving || (showInitialLots && !valid)} onClick={() => void saveStatus()}>{saving ? 'Saving…' : 'Save ownership status'}</button>}{showInitialLots && <><h3>Initial purchase lots</h3><p className="muted">Add at least one active lot to mark this asset as owned.</p><LotEditor lots={lots} updateLot={updateLot} setLots={setLots} /></>}{status === 'Interested' && asset.lots.length > 0 && <p className="panel-note">Saved purchase lots are preserved and can be reused if you switch back to Owned. They are not editable while Interested.</p>}{showEditableLots && <><h3>Active purchase lots</h3><p className="muted">Adjust or remove lots to reflect a partial sale. Sell history is outside this MVP.</p><LotEditor lots={lots} updateLot={updateLot} setLots={setLots} /><div className="lot-total"><span>Total quantity<strong>{quantity || '—'}</strong></span><span>Weighted average<strong>{quantity && asset.currency ? money(Number(average), asset.currency) : '—'}</strong></span></div><button className="button primary full" disabled={!valid || saving} onClick={save}>{saving ? 'Saving…' : 'Save lots'}</button></>}</>}{saveError && <p className="form-error" role="alert">{saveError}</p>}<div className="remove-zone"><h3>Stop following this asset</h3><p>It will leave your watchlist. Previously stored timeline data remains in your personal archive.</p>{confirmingRemoval ? <div className="remove-confirm"><span>Remove {asset.ticker} from the watchlist?</span><button className="button danger" disabled={saving} onClick={() => void remove()}>{saving ? 'Removing…' : 'Remove asset'}</button><button className="text-button" onClick={() => { setConfirmingRemoval(false); setRemoveError('') }}>Cancel</button></div> : <button className="button danger-outline" onClick={() => { setRemoveError(''); setConfirmingRemoval(true) }}>Remove from watchlist</button>}{removeError && <p className="form-error" role="alert">{removeError}</p>}</div></aside>
+  return <aside className="side-panel"><button className="close-button" onClick={onClose} aria-label="Close asset management">×</button><span className="section-kicker">MANAGE ASSET</span><h2>{asset.name}</h2><p className="muted">{asset.ticker} · {asset.exchange} · {asset.type}</p>{asset.type === 'Index' ? <p className="panel-note">Indices are followed for market context and cannot be marked as owned.</p> : <><fieldset><legend>Follow status</legend><label className="radio"><input type="radio" name="managed-status" checked={status === 'Interested'} onChange={() => { setStatus('Interested'); setSaveError('') }} /> Interested</label><label className="radio"><input type="radio" name="managed-status" checked={status === 'Owned'} onChange={() => { setStatus('Owned'); setSaveError('') }} /> Owned</label></fieldset>{status !== asset.status && !showInitialLots && <button className="button primary full" disabled={saving} onClick={() => void saveStatus()}>{saving ? 'Saving…' : 'Save ownership status'}</button>}{showInitialLots && <><h3>Initial purchase lots</h3><p className="muted">Add at least one active lot to mark this asset as owned.</p><LotEditor lots={lots} updateLot={updateLot} setLots={setLots} /><button className="button primary full" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save ownership status'}</button></>}{status === 'Interested' && asset.lots.length > 0 && <p className="panel-note">Saved purchase lots are preserved and can be reused if you switch back to Owned. They are not editable while Interested.</p>}{showEditableLots && <><h3>Active purchase lots</h3><p className="muted">Adjust or remove lots to reflect a partial sale. Sell history is outside this MVP.</p><LotEditor lots={lots} updateLot={updateLot} setLots={setLots} /><div className="lot-total"><span>Total quantity<strong>{quantity || '—'}</strong></span><span>Weighted average<strong>{quantity && asset.currency ? money(Number(average), asset.currency) : '—'}</strong></span></div><button className="button primary full" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save lots'}</button></>}</>}{saveError && <p className="form-error" role="alert">{saveError}</p>}<div className="remove-zone"><h3>Stop following this asset</h3><p>It will leave your watchlist. Previously stored timeline data remains in your personal archive.</p>{confirmingRemoval ? <div className="remove-confirm"><span>Remove {asset.ticker} from the watchlist?</span><button className="button danger" disabled={saving} onClick={() => void remove()}>{saving ? 'Removing…' : 'Remove asset'}</button><button className="text-button" onClick={() => { setConfirmingRemoval(false); setRemoveError('') }}>Cancel</button></div> : <button className="button danger-outline" onClick={() => { setRemoveError(''); setConfirmingRemoval(true) }}>Remove from watchlist</button>}{removeError && <p className="form-error" role="alert">{removeError}</p>}</div></aside>
 }
 
 function LotEditor({ lots, updateLot, setLots }: { lots: Lot[]; updateLot: (id: string, field: keyof Lot, value: string | null) => void; setLots: React.Dispatch<React.SetStateAction<Lot[]>> }) {
