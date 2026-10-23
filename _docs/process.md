@@ -20,8 +20,9 @@ Lifecycle
 2. Engineer implements it
 3. QA verifies it
 4. On FAIL, back to step 2 with the QA comment as input
-5. On PASS, close the issue
-6. Repeat until the backlog is empty
+5. On QA PASS, the orchestrator commits/merges approved changes and posts a concise implementation and QA report with how the human can verify the behavior; **leave the issue open**
+6. The human tests/reviews the implemented behavior and **is the only one who may close the issue**. On human FAIL, return to implementation and QA; on human PASS, the human closes the issue
+7. Repeat until the backlog is empty
 
 Rules
 
@@ -29,4 +30,6 @@ Rules
 - Do not skip step 2
 - The engineer does not close the issue
 - QA does not fix the code, only outputs PASS or FAIL
-- The orchestrator merges the approved work and closes the issue only after QA outputs PASS
+- The orchestrator may merge work only after QA PASS, but **must not close issues**
+- **Only the human owner may close GitHub issues**, after manually accepting the delivered behavior; QA PASS is necessary but not sufficient for closure
+- Codex agents must not change issue state to closed or imply human acceptance; leave each issue open with verification instructions
