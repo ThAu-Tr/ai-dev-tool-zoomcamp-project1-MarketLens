@@ -107,11 +107,22 @@ class RefreshService:
             default=None,
         )
         industries = self.repository.followed_industries(user_id)
+        checked_tickers, checked_industry_ids = self.repository.news_target_snapshot(user_id)
+        current_tickers = sorted({asset.ticker.strip().upper() for asset in assets if asset.ticker.strip()})
+        current_industry_ids = sorted({industry.id for industry in industries})
+        # A global news checkpoint only covers the targets that were in the
+        # query when it was advanced. New targets need one unbounded discovery
+        # query so older, still-relevant articles are not skipped.
+        has_new_targets = (
+            not set(current_tickers).issubset(checked_tickers)
+            or not set(current_industry_ids).issubset(checked_industry_ids)
+        )
+        query_since = None if has_new_targets else since
         # Keep a one-second overlap because Marketaux's published_after filter
         # is strict and its supported timestamp precision includes whole seconds.
         query_started_at = datetime.now(UTC).replace(microsecond=0) - timedelta(seconds=1)
         try:
-            supplied = fetch_news([asset.ticker for asset in assets], since, [industry.name for industry in industries])
+            supplied = fetch_news([asset.ticker for asset in assets], query_since, [industry.name for industry in industries])
         except Exception as error:
             partial_articles = getattr(error, "articles", None)
             if partial_articles is None:
@@ -175,6 +186,7 @@ class RefreshService:
         self.repository.mark_news_status(user_id, "stale" if malformed else "current")
         if not malformed:
             self.repository.mark_news_checked_at(user_id, query_started_at)
+            self.repository.mark_news_targets_checked(user_id, current_tickers, current_industry_ids)
         self.repository.session.commit()
 
 

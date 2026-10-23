@@ -127,8 +127,10 @@ class FakeNewsProvider(FakeMarketProvider):
         self.context = context or []
         self.context_error = context_error
         self.context_calls = 0
+        self.news_calls: list[tuple[list[str], datetime | None, list[str] | None]] = []
 
     def fetch_news(self, tickers, since, industries=None):
+        self.news_calls.append((list(tickers), since, list(industries) if industries is not None else None))
         return self.articles
 
     def fetch_market_context(self, since, tickers=None):
@@ -228,3 +230,61 @@ def test_partial_news_failure_saves_successful_results_and_keeps_existing_articl
     with session_factory() as session:
         assert {article.url for article in session.query(Article)} == {"https://news.test/older", "https://news.test/jobs"}
         assert session.get(RefreshState, 1).news_status == "stale"
+
+
+def test_new_asset_and_industry_bypass_advanced_news_checkpoint(session_factory):
+    seed_asset(session_factory)
+    new_asset_article = news_article("ASML expands EUV capacity", "https://news.test/asml", identifiers=["ASML"])
+    new_industry_article = news_article("Semiconductors see stronger order book", "https://news.test/semis", industries=["Semiconductors"])
+    provider = FakeNewsProvider()
+    provider.quotes = [
+        MarketQuote(ticker, Decimal("100"), "EUR", Decimal("0"), datetime(2026, 10, 22, 9, tzinfo=UTC))
+        for ticker in ("SAP", "ASML")
+    ]
+    client = build_client(session_factory, provider)
+
+    # A successful empty response is still a real checkpoint, not a silent failure.
+    assert client.post("/api/refresh").status_code == 200
+    dashboard = client.get("/api/dashboard").json()
+    assert dashboard["newsStatus"] == "current"
+    assert dashboard["articles"] == []
+    with session_factory() as session:
+        checkpoint = session.get(RefreshState, 1).news_checked_at
+        assert checkpoint is not None
+
+    with session_factory.begin() as session:
+        session.add(Asset(id="asml", user_id=1, name="ASML", ticker="ASML", exchange="Euronext Amsterdam", asset_type="Stock", status="Interested", price=None, currency=None, change_percent=None, as_of=None, industries=["semiconductors"]))
+        session.add(Industry(id="semiconductors", name="Semiconductors"))
+        session.add(IndustryFollow(user_id=1, industry_id="semiconductors"))
+    provider.articles = [new_asset_article, new_industry_article]
+
+    assert client.post("/api/refresh").status_code == 200
+
+    with session_factory() as session:
+        state = session.get(RefreshState, 1)
+        rows = {article.url: article for article in session.query(Article)}
+        assert rows["https://news.test/asml"].assets == ["ASML"]
+        assert rows["https://news.test/semis"].industries == ["semiconductors"]
+        assert state.news_checked_at >= checkpoint
+        assert state.news_asset_tickers == ["ASML", "SAP"]
+        assert state.news_industry_ids == ["semiconductors"]
+    dashboard = client.get("/api/dashboard").json()
+    assert {article["url"] for article in dashboard["articles"]} == {"https://news.test/asml", "https://news.test/semis"}
+    assert {article["relevance"] for article in dashboard["articles"]} == {"Direct asset news", "Industry news"}
+    # The second fetch was deliberately widened to cover newly added targets.
+    assert provider.news_calls[0][1] is None
+    assert provider.news_calls[1][1] is None
+
+
+def test_news_provider_error_marks_news_stale_and_does_not_advance_target_snapshot(session_factory):
+    seed_asset(session_factory)
+    provider = FakeNewsProvider()
+    provider.fetch_news = lambda tickers, since, industries=None: (_ for _ in ()).throw(TimeoutError("offline"))
+
+    assert build_client(session_factory, provider).post("/api/refresh").status_code == 200
+
+    with session_factory() as session:
+        state = session.get(RefreshState, 1)
+        assert state.news_status == "stale"
+        assert state.news_checked_at is None
+        assert state.news_asset_tickers == []

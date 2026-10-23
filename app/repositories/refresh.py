@@ -37,6 +37,20 @@ class RefreshRepository:
         state = self.session.get(RefreshState, user_id)
         return state.news_checked_at if state else None
 
+    def news_target_snapshot(self, user_id: int) -> tuple[list[str], list[str]]:
+        state = self.session.get(RefreshState, user_id)
+        if state is None:
+            return [], []
+        return state.news_asset_tickers or [], state.news_industry_ids or []
+
+    def mark_news_targets_checked(self, user_id: int, tickers: list[str], industry_ids: list[str]) -> None:
+        state = self.session.get(RefreshState, user_id)
+        if state is None:
+            state = RefreshState(user_id=user_id)
+            self.session.add(state)
+        state.news_asset_tickers = sorted({ticker.strip().upper() for ticker in tickers if ticker.strip()})
+        state.news_industry_ids = sorted(set(industry_ids))
+
     def market_context_checked_at(self, user_id: int) -> datetime | None:
         state = self.session.get(RefreshState, user_id)
         return state.market_context_checked_at if state else None
