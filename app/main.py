@@ -4,9 +4,11 @@ from typing import Annotated
 from datetime import date
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.db import get_session
+from app.config import cors_allowed_origins
 from app.providers import ProviderGateway
 from app.provider_factory import create_default_provider_gateway
 from app.repositories.catalogue import AssetCatalogueRepository
@@ -30,6 +32,12 @@ def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
     if provider_gateway is None:
         provider_gateway = create_default_provider_gateway()
     app = FastAPI(title="MarketLens API", openapi_url=None)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_allowed_origins(),
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Content-Type", "Authorization"],
+    )
 
     @app.get("/api/dashboard", response_model=DashboardResponse)
     def get_dashboard(session: Session = Depends(get_session)) -> DashboardResponse:

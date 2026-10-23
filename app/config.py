@@ -30,3 +30,12 @@ def database_url() -> str:
     if not value:
         raise RuntimeError("DATABASE_URL must be set before starting the MarketLens backend.")
     return value
+
+
+def cors_allowed_origins() -> list[str]:
+    """Return the exact origins allowed to call the API from a browser."""
+    configured_origins = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+    origins = [origin.strip() for origin in configured_origins.split(",") if origin.strip()]
+    if "*" in origins:
+        raise RuntimeError("CORS_ALLOWED_ORIGINS must list exact origins; '*' is not allowed.")
+    return origins
