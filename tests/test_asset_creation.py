@@ -60,6 +60,26 @@ def test_create_stock_etf_and_index_persists_catalogue_metadata_without_a_quote(
         ]
 
 
+def test_create_apple_persists_catalogue_identity_and_rejects_duplicate() -> None:
+    client, session_factory = build_client()
+    apple = {"name": "Apple Inc.", "ticker": "AAPL", "exchange": "NASDAQ", "type": "Stock", "status": "Interested"}
+
+    created = client.post("/api/assets", json=apple)
+    duplicate = client.post("/api/assets", json=apple)
+
+    assert created.status_code == 201
+    assert {key: created.json()[key] for key in ("name", "ticker", "exchange", "type", "industries")} == {
+        "name": "Apple Inc.", "ticker": "AAPL", "exchange": "NASDAQ", "type": "Stock", "industries": ["Technology hardware"],
+    }
+    assert created.json()["price"] is None
+    assert duplicate.status_code == 422
+    assert duplicate.json()["detail"] == "This asset is already in your watchlist."
+
+    with session_factory() as session:
+        apples = list(session.query(Asset).filter_by(ticker="AAPL"))
+    assert len(apples) == 1
+
+
 def test_create_rejects_tampered_unknown_and_duplicate_catalogue_selections() -> None:
     client, _ = build_client()
     valid = {"name": "ASML Holding", "ticker": "ASML", "exchange": "Euronext Amsterdam", "asset_type": "Stock", "status": "Interested"}

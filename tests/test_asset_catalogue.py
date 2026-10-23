@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.repositories.catalogue import AssetCatalogueRepository
 from app.services.catalogue import AssetCatalogueService
 
 
@@ -21,6 +22,19 @@ def test_catalogue_search_returns_empty_list_for_no_match() -> None:
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_catalogue_includes_apple_and_a_bounded_mix_of_stocks_etfs_and_indices() -> None:
+    client = TestClient(create_app())
+
+    apple = client.get('/api/assets/search', params={'q': 'aapl'})
+    assert apple.status_code == 200
+    assert apple.json() == [{'name': 'Apple Inc.', 'ticker': 'AAPL', 'exchange': 'NASDAQ', 'type': 'Stock'}]
+
+    records = list(AssetCatalogueRepository().entries())
+    assert len(records) >= 25
+    assert {entry['type'] for entry in records} == {'Stock', 'ETF', 'Index'}
+    assert len({(entry['ticker'].casefold(), entry['exchange'].casefold()) for entry in records}) == len(records)
 
 
 def test_catalogue_service_discards_duplicate_and_malformed_records() -> None:

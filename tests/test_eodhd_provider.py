@@ -32,8 +32,15 @@ def fake_opener(responses, seen):
 
 def test_symbol_mapping_and_realtime_normalization_return_catalogue_ticker():
     assert EODHD_SYMBOLS == {
-        "ASML": "ASML.AS", "BMW": "BMW.XETRA", "ICLN": "ICLN.US",
-        "VOO": "VOO.US", "SPX": "GSPC.INDX",
+        "ASML": "ASML.AS", "BMW": "BMW.XETRA", "AAPL": "AAPL.US",
+        "MSFT": "MSFT.US", "NVDA": "NVDA.US", "GOOGL": "GOOGL.US",
+        "AMZN": "AMZN.US", "META": "META.US", "TSLA": "TSLA.US",
+        "JPM": "JPM.US", "BRK.B": "BRK-B.US", "JNJ": "JNJ.US",
+        "LLY": "LLY.US", "V": "V.US", "XOM": "XOM.US", "WMT": "WMT.US",
+        "KO": "KO.US", "ORCL": "ORCL.US", "AMD": "AMD.US", "CRM": "CRM.US",
+        "ICLN": "ICLN.US", "VOO": "VOO.US", "VTI": "VTI.US", "QQQ": "QQQ.US",
+        "VEA": "VEA.US", "IEMG": "IEMG.US", "GLD": "GLD.US",
+        "SPX": "GSPC.INDX", "IXIC": "IXIC.INDX", "DJI": "DJI.INDX",
     }
     seen = []
     gateway = EodhdMarketGateway("secret", opener=fake_opener([{
@@ -123,6 +130,21 @@ def test_missing_key_is_reported_as_unavailable_without_http():
     gateway = EodhdMarketGateway("")
     result = gateway.fetch_market_data(["ASML"], None)
     assert result.quotes == [] and result.unavailable_tickers == ["ASML"]
+
+
+def test_new_stock_and_index_mappings_use_eodhd_symbols_and_usd_currency():
+    seen = []
+    gateway = EodhdMarketGateway("secret", opener=fake_opener([
+        {"close": "225.50", "currency": "USD", "timestamp": 1792584000},
+        {"close": "45000", "currency": "USD", "timestamp": 1792584000},
+    ], seen))
+
+    results = gateway.fetch_market_data(["AAPL", "DJI"], None)
+
+    assert [quote.ticker for quote in results.quotes] == ["AAPL", "DJI"]
+    assert [quote.currency for quote in results.quotes] == ["USD", "USD"]
+    assert "/real-time/AAPL.US" in seen[0][0]
+    assert "/real-time/DJI.INDX" in seen[1][0]
 
 
 def test_default_gateway_is_configured_from_environment(monkeypatch):

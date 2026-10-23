@@ -17,11 +17,36 @@ from app.providers import MarketDataResult, MarketQuote
 EODHD_SYMBOLS = {
     "ASML": "ASML.AS",
     "BMW": "BMW.XETRA",
+    "AAPL": "AAPL.US",
+    "MSFT": "MSFT.US",
+    "NVDA": "NVDA.US",
+    "GOOGL": "GOOGL.US",
+    "AMZN": "AMZN.US",
+    "META": "META.US",
+    "TSLA": "TSLA.US",
+    "JPM": "JPM.US",
+    "BRK.B": "BRK-B.US",
+    "JNJ": "JNJ.US",
+    "LLY": "LLY.US",
+    "V": "V.US",
+    "XOM": "XOM.US",
+    "WMT": "WMT.US",
+    "KO": "KO.US",
+    "ORCL": "ORCL.US",
+    "AMD": "AMD.US",
+    "CRM": "CRM.US",
     "ICLN": "ICLN.US",
     "VOO": "VOO.US",
+    "VTI": "VTI.US",
+    "QQQ": "QQQ.US",
+    "VEA": "VEA.US",
+    "IEMG": "IEMG.US",
+    "GLD": "GLD.US",
     "SPX": "GSPC.INDX",
+    "IXIC": "IXIC.INDX",
+    "DJI": "DJI.INDX",
 }
-EODHD_CURRENCIES = {"ASML": "EUR", "BMW": "EUR", "ICLN": "USD", "VOO": "USD", "SPX": "USD"}
+EODHD_CURRENCIES = {"ASML": "EUR", "BMW": "EUR", **{ticker: "USD" for ticker in EODHD_SYMBOLS if ticker not in {"ASML", "BMW"}}}
 EODHD_API = "https://eodhd.com/api"
 
 

@@ -16,6 +16,8 @@ The following vertical slices are complete:
 
 - A persisted, read-only dashboard through `GET /api/dashboard`, including empty, error, and uncertainty-aware AI-context states.
 - A deterministic catalogue search for supported Stocks, ETFs, and Indices through `GET /api/assets/search`.
+
+The picker uses a deliberately bounded, local catalogue of commonly traded US and European stocks, broad-market and thematic ETFs, and selected indices. It is a curated MVP list, not a complete securities master or live discovery service. Maintainers should verify new EODHD symbols against EODHD's supported-tickers list before adding them; picker searches never call a provider, and an entry does not promise data coverage for every account or date. Unmapped symbols are reported as unavailable by the market-data adapter rather than receiving a fabricated quote. Industry suggestions come from explicit catalogue metadata and are never automatically followed.
 - Catalogue-validated creation of an Owned or Interested watchlist asset through `POST /api/assets`.
 - PostgreSQL-oriented persistence with Alembic migrations and a seeded demo-user model.
 - Backend tests, React component/API tests, and a production frontend build check.

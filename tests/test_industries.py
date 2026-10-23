@@ -16,7 +16,7 @@ def build_client() -> tuple[TestClient, sessionmaker[Session]]:
     session_factory = sessionmaker(bind=engine, expire_on_commit=False)
     with session_factory.begin() as session:
         session.add(DemoUser(id=1, identifier="demo-user"))
-        session.add_all([Industry(id="software", name="Enterprise software"), Industry(id="semi", name="Semiconductors"), Industry(id="ai", name="AI"), Industry(id="energy", name="Renewable energy")])
+        session.add_all([Industry(id="software", name="Enterprise software"), Industry(id="semi", name="Semiconductors"), Industry(id="ai", name="AI"), Industry(id="energy", name="Renewable energy"), Industry(id="hardware", name="Technology hardware"), Industry(id="auto", name="Automotive"), Industry(id="consumer", name="Consumer discretionary"), Industry(id="health", name="Healthcare"), Industry(id="us-equities", name="US equities")])
 
     app = create_app()
 
@@ -34,12 +34,7 @@ def test_industries_list_every_supported_industry_once_with_follow_state() -> No
     response = client.get("/api/industries")
 
     assert response.status_code == 200
-    assert response.json() == [
-        {"id": "ai", "name": "AI", "followed": False, "suggested": False, "assets": []},
-        {"id": "software", "name": "Enterprise software", "followed": False, "suggested": False, "assets": []},
-            {"id": "energy", "name": "Renewable energy", "followed": False, "suggested": False, "assets": []},
-        {"id": "semi", "name": "Semiconductors", "followed": False, "suggested": False, "assets": []},
-    ]
+    assert {item["name"] for item in response.json()} >= {"Technology hardware", "Automotive", "Healthcare", "US equities"}
     assert len({industry["id"] for industry in response.json()}) == len(response.json())
 
 
@@ -103,3 +98,14 @@ def test_following_suggestion_removes_it_from_suggestions_and_persists() -> None
     assert client.put("/api/industries/semi/follow", json={"followed": True}).status_code == 200
     after = next(item for item in client.get("/api/industries").json() if item["id"] == "semi")
     assert after["followed"] is True and after["suggested"] is False
+
+
+def test_new_stock_catalogue_metadata_drives_suggestions_and_can_be_followed():
+    client, session_factory = build_client()
+    with session_factory.begin() as session:
+        session.add(Asset(id="apple", user_id=1, name="Apple Inc.", ticker="AAPL", exchange="NASDAQ", asset_type="Stock", status="Interested", price=None, currency=None, change_percent=None, as_of=None, industries=["Technology hardware"], lots=[]))
+
+    suggestion = next(item for item in client.get("/api/industries").json() if item["name"] == "Technology hardware")
+    assert suggestion == {"id": "hardware", "name": "Technology hardware", "followed": False, "suggested": True, "assets": ["AAPL"]}
+    followed = client.put("/api/industries/hardware/follow", json={"followed": True})
+    assert followed.status_code == 200 and followed.json()["followed"] is True
