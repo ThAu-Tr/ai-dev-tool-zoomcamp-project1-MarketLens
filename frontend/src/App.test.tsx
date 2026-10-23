@@ -102,6 +102,18 @@ describe('dashboard', () => {
     expect(screen.getByRole('button', { name: /Refresh data/ })).toBeEnabled()
   })
 
+  it('explains why context is unavailable and keeps previously stored cards during cooldown', async () => {
+    getDashboard.mockResolvedValue({ ...populatedDashboard, summaries: [], aiStatus: 'unavailable' })
+    const { unmount } = render(<App />)
+    expect(await screen.findByRole('status')).toHaveTextContent('provider is not configured')
+
+    getDashboard.mockResolvedValue({ ...populatedDashboard, aiStatus: 'cooldown' })
+    unmount()
+    render(<App />)
+    expect(await screen.findByRole('status')).toHaveTextContent('Previously stored context is shown')
+    expect(screen.getByText('Possible context; verify the linked report.')).toBeInTheDocument()
+  })
+
   it('loads the selected historical date through the timeline API and exposes retryable errors', async () => {
     getDashboard.mockResolvedValue(populatedDashboard)
     let finishInitialLoad!: (day: TimelineDay) => void

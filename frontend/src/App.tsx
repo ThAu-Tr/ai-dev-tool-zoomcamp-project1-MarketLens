@@ -140,11 +140,21 @@ function DashboardView({ dashboard, refreshing, onRefresh, onManage, onAdd }: { 
       </div>
       <aside className="insight-column">
         <span className="section-kicker">AI-GENERATED CONTEXT</span><h2>Possible connections</h2>
+        {dashboard.summaries.length > 0 && dashboard.aiStatus === 'cooldown' && <p className="empty-copy" role="status">Previously stored context is shown. A newer summary can be generated after the one-hour request limit.</p>}
+        {dashboard.summaries.length > 0 && dashboard.aiStatus === 'failed' && <p className="empty-copy" role="status">The latest AI context update failed. Previously stored cards remain available.</p>}
         {dashboard.summaries.length ? dashboard.summaries.map((summary) => {
           const asset = dashboard.assets.find((item) => item.id === summary.assetId)
           const sources = dashboard.articles.filter((article) => summary.articleIds.includes(article.id))
           return <article className="insight-card" key={summary.id}><div className="insight-icon">✦</div><span className="chip violet">AI-generated context</span><h3>{asset?.name}</h3>{asset?.changePercent != null && <span className={asset.changePercent >= 0 ? 'positive' : 'negative'}>{asset.changePercent >= 0 ? 'Up' : 'Down'} {pct(asset.changePercent)}</span>}<p>{summary.summary}</p><div className="source-list">{sources.map((source) => <a key={source.id} href={source.url} target="_blank" rel="noreferrer">{source.source} ↗</a>)}</div></article>
-        }) : <p className="empty-copy">No AI context is stored yet.</p>}
+        }) : <p className="empty-copy" role="status">{dashboard.aiStatus === 'unavailable'
+          ? 'AI context is unavailable because its provider is not configured.'
+          : dashboard.aiStatus === 'cooldown'
+            ? 'AI context was checked recently. It can update after the one-hour request limit.'
+            : dashboard.aiStatus === 'failed'
+              ? 'AI context could not be generated. Price and news refresh succeeded; try again later.'
+              : dashboard.aiStatus === 'no_evidence'
+                ? 'No recent price movement and relevant news met the source checks for AI context.'
+                : 'No AI context is stored yet.'}</p>}
         <p className="disclaimer">AI-generated market context may be incomplete or incorrect. Verify important conclusions using the linked sources.</p>
       </aside>
     </section>

@@ -11,6 +11,14 @@ from app.repositories.refresh import RefreshRepository
 class ContextRepository(RefreshRepository):
     """Persisted evidence and atomic, restart-safe demo budget checkpoint."""
 
+    def set_ai_status(self, user_id: int, status: str) -> None:
+        state = self.session.get(RefreshState, user_id)
+        if state is None:
+            state = RefreshState(user_id=user_id)
+            self.session.add(state)
+        state.ai_status = status
+        self.session.commit()
+
     def claim_budget(self, user_id: int, now: datetime) -> bool:
         state = self.session.get(RefreshState, user_id)
         if state is None:

@@ -50,6 +50,7 @@ export type Dashboard = {
   summaries: ContextSummary[]
   lastRefreshedAt: string
   newsStatus?: 'current' | 'stale'
+  aiStatus?: 'unknown' | 'current' | 'no_evidence' | 'unavailable' | 'cooldown' | 'failed'
 }
 
 export type Industry = { id: string; name: string; followed: boolean; suggested?: boolean; assets?: string[] }

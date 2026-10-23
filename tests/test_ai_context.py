@@ -67,6 +67,7 @@ def test_generates_only_from_persisted_evidence_and_reuses_across_sessions(sessi
         assert "Possible context" in body["summaries"][0]["summary"]
         assert "may be relevant" in body["summaries"][0]["summary"]
     assert len(provider.calls) == 1
+    assert build_client(session_factory).get("/api/dashboard").json()["aiStatus"] == "current"
     supplied = provider.calls[0][1]["assets"][0]
     assert supplied["price"] == "100.000000"
     assert supplied["articles"][0]["id"] == "report"
@@ -84,12 +85,14 @@ def test_changed_evidence_replaces_old_card_after_persisted_cooldown(session_fac
         session.get(Asset, "sap").change_percent = Decimal("-2.5")
     run(session_factory, provider, NOW + timedelta(minutes=2))
     assert len(provider.calls) == 1
+    assert build_client(session_factory).get("/api/dashboard").json()["aiStatus"] == "cooldown"
     run(session_factory, provider, NOW + timedelta(hours=2))
     with session_factory() as session:
         summary = session.query(ContextSummary).one()
         assert summary.id != old_id
         assert "-2.50%" in summary.summary
     assert len(provider.calls) == 2
+    assert build_client(session_factory).get("/api/dashboard").json()["aiStatus"] == "current"
 
 
 def test_ambiguous_fallback_then_summary_uses_persisted_classification(session_factory):
@@ -214,6 +217,7 @@ def test_missing_supported_context_omits_summary_without_ai_call(session_factory
     provider = FakeAI()
     run(session_factory, provider)
     assert provider.calls == []
+    assert build_client(session_factory).get("/api/dashboard").json()["aiStatus"] == "no_evidence"
 
 
 def test_unavailable_credentials_no_request_or_checkpoint(session_factory):
@@ -222,8 +226,11 @@ def test_unavailable_credentials_no_request_or_checkpoint(session_factory):
     provider.ai_available = False
     run(session_factory, provider)
     assert provider.calls == []
+    assert build_client(session_factory).get("/api/dashboard").json()["aiStatus"] == "unavailable"
     with session_factory() as session:
-        assert session.get(RefreshState, 1) is None
+        state = session.get(RefreshState, 1)
+        assert state.ai_checked_at is None
+        assert state.ai_status == "unavailable"
 
 
 def test_failure_checkpoint_survives_restart_and_preserves_summary(session_factory):
@@ -233,8 +240,10 @@ def test_failure_checkpoint_survives_restart_and_preserves_summary(session_facto
         session.get(Asset, "sap").change_percent = Decimal("3")
     provider = FakeAI(error=RuntimeError("quota secret key"))
     run(session_factory, provider, NOW + timedelta(hours=2))
+    assert build_client(session_factory).get("/api/dashboard").json()["aiStatus"] == "failed"
     run(session_factory, provider, NOW + timedelta(hours=2, minutes=1))
     assert len(provider.calls) == 1
+    assert build_client(session_factory).get("/api/dashboard").json()["aiStatus"] == "cooldown"
     with session_factory() as session:
         assert session.query(ContextSummary).count() == 1
         assert "secret" not in session.query(ContextSummary).one().summary
@@ -256,6 +265,35 @@ def test_ai_failure_does_not_break_successful_price_news_refresh(session_factory
     with session_factory() as session:
         assert session.get(Asset, "sap").price == Decimal("101.000000")
         assert session.query(Article).count() == 1
+    assert build_client(session_factory).get("/api/dashboard").json()["aiStatus"] == "failed"
+
+
+def test_manual_refresh_persists_and_reloads_source_linked_context(session_factory):
+    from tests.test_direct_news import FakeNewsProvider, news
+
+    seed_asset(session_factory)
+
+    class RefreshWithAI(FakeNewsProvider):
+        def __init__(self):
+            super().__init__([news("SAP expands cloud services", ["SAP"])])
+            self.ai_calls = []
+
+        def generate_context(self, task, evidence):
+            self.ai_calls.append((task, evidence))
+            article_id = evidence["assets"][0]["articles"][0]["id"]
+            return {"summaries": [{"asset_id": "sap", "article_ids": [article_id]}]} if task == "summarize" else {"classifications": []}
+
+    provider = RefreshWithAI()
+    assert build_client(session_factory, provider).post("/api/refresh").status_code == 200
+    dashboard = build_client(session_factory).get("/api/dashboard").json()
+    assert dashboard["aiStatus"] == "current"
+    assert dashboard["summaries"][0]["assetId"] == "sap"
+    assert dashboard["summaries"][0]["articleIds"]
+    assert dashboard["articles"][0]["url"] == "https://news.example/direct"
+    assert [task for task, evidence in provider.ai_calls] == ["summarize"]
+    assert len(provider.ai_calls[0][1]["assets"]) == 1
+    assert build_client(session_factory).get("/api/dashboard").json()["summaries"] == dashboard["summaries"]
+    assert [task for task, evidence in provider.ai_calls] == ["summarize"]
 
 
 class Response:
@@ -358,7 +396,7 @@ def test_ai_checkpoint_migration_preserves_existing_data(tmp_path, monkeypatch):
     url = "sqlite:///" + (tmp_path / "migration.db").as_posix()
     monkeypatch.setenv("DATABASE_URL", url)
     config = Config("alembic.ini")
-    command.upgrade(config, "20261022_08")
+    command.upgrade(config, "20261023_10")
     engine = create_engine(url)
     with engine.begin() as connection:
         before = list(connection.execute(text("SELECT * FROM demo_users")))
@@ -366,6 +404,7 @@ def test_ai_checkpoint_migration_preserves_existing_data(tmp_path, monkeypatch):
     with engine.connect() as connection:
         assert list(connection.execute(text("SELECT * FROM demo_users"))) == before
     assert "ai_checked_at" in {column["name"] for column in inspect(engine).get_columns("refresh_states")}
+    assert "ai_status" in {column["name"] for column in inspect(engine).get_columns("refresh_states")}
     engine.dispose()
 
 

@@ -91,6 +91,7 @@ class DashboardResponse(ApiModel):
     summaries: list[ContextSummaryResponse]
     lastRefreshedAt: str
     newsStatus: Literal["current", "stale"] = "current"
+    aiStatus: Literal["unknown", "current", "no_evidence", "unavailable", "cooldown", "failed"] = "unknown"
 
 
 class RefreshResponse(ApiModel):

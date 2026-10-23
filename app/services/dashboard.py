@@ -70,6 +70,7 @@ class DashboardService:
             ],
             lastRefreshedAt=_timestamp_text(refresh_state.last_refreshed_at) if refresh_state and refresh_state.last_refreshed_at else "Not refreshed yet",
             newsStatus=refresh_state.news_status if refresh_state else "current",
+            aiStatus=refresh_state.ai_status if refresh_state else "unknown",
         )
 
 

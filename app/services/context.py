@@ -60,10 +60,9 @@ class ContextService:
 
     def refresh(self, user_id: int) -> None:
         generate = getattr(self.provider, "generate_context", None)
-        if not callable(generate) or getattr(self.provider, "ai_available", True) is False:
-            return
         assets = self.repository.assets_for(user_id)[:5]
         if not assets:
+            self.repository.set_ai_status(user_id, "no_evidence")
             return
         since = self.now - timedelta(days=3)
         industries = self.repository.followed_industries(user_id)[:8]
@@ -71,9 +70,16 @@ class ContextService:
                      if _utc(row.published_at) <= self.now]
         pending = self._pending(user_id, assets, industries, since)
         if not ambiguous and not pending:
+            has_summary = any(self.repository.summaries_for(user_id, asset.id) for asset in assets)
+            self.repository.set_ai_status(user_id, "current" if has_summary else "no_evidence")
+            return
+        if not callable(generate) or getattr(self.provider, "ai_available", True) is False:
+            self.repository.set_ai_status(user_id, "unavailable")
             return
         if not self.repository.claim_budget(user_id, self.now):
+            self.repository.set_ai_status(user_id, "cooldown")
             return
+        status = "failed"
         if ambiguous:
             facts = {"assets": [{"id": a.ticker, "name": a.name} for a in assets],
                      "industries": [{"id": i.id, "name": i.name} for i in industries],
@@ -82,10 +88,14 @@ class ContextService:
                 result = generate("classify", facts)
                 self._classify(result, ambiguous, assets, industries)
                 self.repository.session.commit()
+                status = "current"
             except Exception:
                 self.repository.session.rollback()
         pending = self._pending(user_id, assets, industries, since)
         if not pending:
+            # A valid run that classifies every candidate as irrelevant (or
+            # cannot validate the links) correctly produces no card.
+            self.repository.set_ai_status(user_id, "no_evidence" if status != "failed" else "failed")
             return
         facts = {"assets": [{"id": a.id, "ticker": a.ticker, "price": str(a.price), "currency": a.currency,
                              "change_percent": str(a.change_percent), "as_of": _utc(a.as_of).isoformat(),
@@ -93,10 +103,13 @@ class ContextService:
                             for a, rows, fingerprint in pending]}
         try:
             result = generate("summarize", facts)
-            self._save_summaries(user_id, result, pending)
+            saved = self._save_summaries(user_id, result, pending)
             self.repository.session.commit()
+            status = "current" if saved else "failed"
         except Exception:
             self.repository.session.rollback()
+            status = "failed"
+        self.repository.set_ai_status(user_id, status)
 
     @staticmethod
     def _article_fact(article) -> dict:
@@ -172,12 +185,13 @@ class ContextService:
 
     def _save_summaries(self, user_id, result, pending):
         if not isinstance(result, dict) or set(result) != {"summaries"}:
-            return
+            return False
         rows = result["summaries"]
         if not isinstance(rows, list) or len(rows) > 5:
-            return
+            return False
         available = {asset.id: (asset, articles, fingerprint) for asset, articles, fingerprint in pending}
         seen = set()
+        saved = False
         for row in rows:
             if not isinstance(row, dict) or set(row) != {"asset_id", "article_ids"} or not isinstance(row["asset_id"], str):
                 continue
@@ -203,3 +217,5 @@ class ContextService:
                     "These reports may be relevant; they do not establish a cause of the movement.")
             if len(text) <= 600:
                 self.repository.save_summary(user_id, asset.id, fingerprint, text, ids)
+                saved = True
+        return saved
