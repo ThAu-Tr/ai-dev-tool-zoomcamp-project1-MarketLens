@@ -44,6 +44,15 @@ def _safe_article(article) -> bool:
             and bool(article.headline.strip()))
 
 
+def _after_cursor(assets: list, cursor: str | None) -> list:
+    """Start after the last processed asset so bounded batches visit all assets."""
+    ids = [asset.id for asset in assets]
+    if cursor not in ids:
+        return assets
+    index = ids.index(cursor) + 1
+    return assets[index:] + assets[:index]
+
+
 def _relevant(article, asset, followed: dict[str, str]) -> bool:
     if article.relevance == "Direct asset news":
         return asset.ticker in article.assets
@@ -60,17 +69,19 @@ class ContextService:
 
     def refresh(self, user_id: int) -> None:
         generate = getattr(self.provider, "generate_context", None)
-        assets = self.repository.assets_for(user_id)[:5]
-        if not assets:
+        all_assets = self.repository.assets_for(user_id)
+        if not all_assets:
             self.repository.set_ai_status(user_id, "no_evidence")
             return
+        ordered_assets = _after_cursor(all_assets, self.repository.ai_asset_cursor(user_id))
+        asset_batch = ordered_assets[:5]
         since = self.now - timedelta(days=3)
         industries = self.repository.followed_industries(user_id)[:8]
         ambiguous = [row for row in self.repository.articles_for(user_id, since, ambiguous=True)
                      if _utc(row.published_at) <= self.now]
-        pending = self._pending(user_id, assets, industries, since)
+        pending = self._pending(user_id, ordered_assets, industries, since)[:5]
         if not ambiguous and not pending:
-            has_summary = any(self.repository.summaries_for(user_id, asset.id) for asset in assets)
+            has_summary = any(self.repository.summaries_for(user_id, asset.id) for asset in all_assets)
             self.repository.set_ai_status(user_id, "current" if has_summary else "no_evidence")
             return
         if not callable(generate) or getattr(self.provider, "ai_available", True) is False:
@@ -80,23 +91,25 @@ class ContextService:
             self.repository.set_ai_status(user_id, "cooldown")
             return
         status = "failed"
+        cursor = pending[-1][0].id if pending else asset_batch[-1].id
         if ambiguous:
-            facts = {"assets": [{"id": a.ticker, "name": a.name} for a in assets],
+            facts = {"assets": [{"id": a.ticker, "name": a.name} for a in asset_batch],
                      "industries": [{"id": i.id, "name": i.name} for i in industries],
                      "articles": [self._article_fact(a) for a in ambiguous]}
             try:
                 result = generate("classify", facts)
-                self._classify(result, ambiguous, assets, industries)
+                self._classify(result, ambiguous, asset_batch, industries)
                 self.repository.session.commit()
                 status = "current"
             except Exception:
                 self.repository.session.rollback()
-        pending = self._pending(user_id, assets, industries, since)
+        pending = self._pending(user_id, ordered_assets, industries, since)[:5]
         if not pending:
             # A valid run that classifies every candidate as irrelevant (or
             # cannot validate the links) correctly produces no card.
-            self.repository.set_ai_status(user_id, "no_evidence" if status != "failed" else "failed")
+            self.repository.set_ai_status(user_id, "no_evidence" if status != "failed" else "failed", cursor)
             return
+        cursor = pending[-1][0].id
         facts = {"assets": [{"id": a.id, "ticker": a.ticker, "price": str(a.price), "currency": a.currency,
                              "change_percent": str(a.change_percent), "as_of": _utc(a.as_of).isoformat(),
                              "articles": [self._article_fact(row) for row in rows]}
@@ -109,7 +122,7 @@ class ContextService:
         except Exception:
             self.repository.session.rollback()
             status = "failed"
-        self.repository.set_ai_status(user_id, status)
+        self.repository.set_ai_status(user_id, status, cursor)
 
     @staticmethod
     def _article_fact(article) -> dict:

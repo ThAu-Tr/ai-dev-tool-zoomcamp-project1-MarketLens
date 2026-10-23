@@ -6,7 +6,7 @@ from urllib.error import HTTPError, URLError
 import pytest
 
 from app.adapters.openai import AIUnavailableError, INSTRUCTIONS, OpenAIProvider
-from app.models import Article, Asset, ContextSummary, Industry, IndustryFollow, RefreshState
+from app.models import Article, Asset, ContextSummary, DemoUser, Industry, IndustryFollow, RefreshState
 from app.repositories.context import ContextRepository
 from app.services.context import ContextService
 from tests.test_dashboard import build_client
@@ -296,6 +296,39 @@ def test_manual_refresh_persists_and_reloads_source_linked_context(session_facto
     assert [task for task, evidence in provider.ai_calls] == ["summarize"]
 
 
+def test_round_robin_batch_reaches_eligible_assets_after_the_first_five(session_factory):
+    with session_factory.begin() as session:
+        session.add(DemoUser(id=1, identifier="demo-user"))
+        for index in range(6):
+            ticker = f"T{index}"
+            session.add(Asset(id=f"asset-{index}", user_id=1, name=ticker, ticker=ticker, exchange="TEST",
+                              asset_type="Stock", status="Interested", price=Decimal("100"), currency="USD",
+                              change_percent=Decimal("1"), as_of=NOW - timedelta(hours=1), industries=[]))
+            session.add(article(f"story-{index}", headline=f"{ticker} releases quarterly results", assets=[ticker]))
+
+    class FirstAssetAI:
+        ai_available = True
+
+        def __init__(self):
+            self.selected = []
+
+        def generate_context(self, task, evidence):
+            first = evidence["assets"][0]
+            self.selected.append(first["id"])
+            return {"summaries": [{"asset_id": first["id"], "article_ids": [first["articles"][0]["id"]]}]}
+
+    provider = FirstAssetAI()
+    run(session_factory, provider)
+    with session_factory.begin() as session:
+        for index in range(6):
+            session.get(Asset, f"asset-{index}").change_percent = Decimal("2")
+    run(session_factory, provider, NOW + timedelta(hours=1))
+
+    assert provider.selected == ["asset-0", "asset-5"]
+    with session_factory() as session:
+        assert session.query(ContextSummary).filter_by(asset_id="asset-5").count() == 1
+
+
 class Response:
     def __init__(self, payload): self.payload = payload
     def __enter__(self): return self
@@ -405,6 +438,7 @@ def test_ai_checkpoint_migration_preserves_existing_data(tmp_path, monkeypatch):
         assert list(connection.execute(text("SELECT * FROM demo_users"))) == before
     assert "ai_checked_at" in {column["name"] for column in inspect(engine).get_columns("refresh_states")}
     assert "ai_status" in {column["name"] for column in inspect(engine).get_columns("refresh_states")}
+    assert "ai_asset_cursor" in {column["name"] for column in inspect(engine).get_columns("refresh_states")}
     engine.dispose()
 
 

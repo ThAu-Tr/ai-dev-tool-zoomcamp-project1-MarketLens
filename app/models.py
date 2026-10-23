@@ -100,6 +100,7 @@ class RefreshState(Base):
     market_context_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ai_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ai_status: Mapped[str] = mapped_column(String(24), default="unknown")
+    ai_asset_cursor: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
 
 class HistoricalDay(Base):
