@@ -419,9 +419,20 @@ describe('dashboard', () => {
     expect(saveLots).toHaveBeenCalledWith('sap', expect.arrayContaining([expect.objectContaining({ quantity: '2.5', purchasePrice: '99.10', purchaseDate: '2026-05-01' })]))
     resolveSave(updated.assets[0])
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Save lots' })).not.toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'Dashboard' }))
     expect(await screen.findByText('10 active shares')).toBeInTheDocument()
     expect(screen.getByText('Avg. €100.00')).toBeInTheDocument()
+  })
+
+  it('removes an individual lot and saves only the remaining lots', async () => {
+    getDashboard.mockResolvedValue(populatedDashboard)
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /manage lots/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove lot 1' }))
+    expect(screen.queryByLabelText('Lot 2 quantity')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Lot 1 quantity')).toHaveValue('3')
+    expect(screen.getByLabelText('Lot 1 price')).toHaveValue('150.00')
+    fireEvent.click(screen.getByRole('button', { name: 'Save lots' }))
+    await waitFor(() => expect(saveLots).toHaveBeenCalledWith('sap', [{ id: 'sap-2', quantity: '3', purchasePrice: '150.00' }]))
   })
 
   it('shows actionable validation feedback for an invalid lot without submitting it', async () => {
@@ -466,7 +477,6 @@ describe('dashboard', () => {
     fireEvent.click(saveButton)
     await waitFor(() => expect(saveStatus).toHaveBeenCalledWith('sap', { status: 'Owned', lots: [expect.objectContaining({ quantity: '2', purchasePrice: '100', purchaseDate: '2026-06-01' })] }))
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Save ownership status' })).not.toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'Dashboard' }))
     expect(await screen.findByText('2 active shares')).toBeInTheDocument()
     expect(screen.getByText('Avg. €100.00')).toBeInTheDocument()
   })
