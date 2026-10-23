@@ -61,6 +61,29 @@ const localDateLabel = (isoDate: string) => new Intl.DateTimeFormat('en-US', { w
 describe('dashboard', () => {
   beforeEach(() => { vi.resetAllMocks(); setIndustryFollowed.mockResolvedValue({ id: 'industry', name: 'Industry', followed: false }); searchAssets.mockResolvedValue([]); getIndustries.mockResolvedValue([]); removeAsset.mockResolvedValue(); saveLots.mockResolvedValue(populatedDashboard.assets[0]); saveStatus.mockResolvedValue(populatedDashboard.assets[0]); createAsset.mockResolvedValue({ id: 'asml-id', name: 'ASML Holding', ticker: 'ASML', exchange: 'Euronext Amsterdam', type: 'Stock', status: 'Interested', price: null, currency: null, changePercent: null, asOf: null, lots: [], industries: ['Semiconductors'] }) })
 
+  it('labels dashboard movement against the previous close and keeps quote as-of context for all asset types', async () => {
+    const stock = populatedDashboard.assets[0]
+    getDashboard.mockResolvedValue({ ...populatedDashboard, assets: [
+      { ...stock, id: 'aapl', ticker: 'AAPL', name: 'Apple Inc.', type: 'Stock', price: 225.5, currency: 'USD', changePercent: 1.25 },
+      { ...stock, id: 'voo', ticker: 'VOO', name: 'Vanguard S&P 500 ETF', type: 'ETF', status: 'Interested', price: 540, currency: 'USD', changePercent: -0.5, lots: [] },
+      { ...stock, id: 'spx', ticker: 'SPX', name: 'S&P 500', type: 'Index', status: 'Interested', price: 45000, currency: 'USD', changePercent: null, lots: [] },
+    ] })
+
+    render(<App />)
+
+    const stockCard = (await screen.findByText('Apple Inc.')).closest('article')!
+    expect(within(stockCard).getByText('↑ +1.25%')).toBeInTheDocument()
+    expect(within(stockCard).getByText('Change vs previous close · Quote as of 2026-10-20T09:45:00Z')).toBeInTheDocument()
+
+    const etfCard = screen.getByText('Vanguard S&P 500 ETF').closest('article')!
+    expect(within(etfCard).getByText('↓ -0.50%')).toBeInTheDocument()
+    expect(within(etfCard).getByText(/Change vs previous close · Quote as of/)).toBeInTheDocument()
+
+    const indexCard = screen.getByText('S&P 500').closest('article')!
+    expect(within(indexCard).queryByText(/%/)).not.toBeInTheDocument()
+    expect(within(indexCard).getByText('Change comparison unavailable · Quote as of 2026-10-20T09:45:00Z')).toBeInTheDocument()
+  })
+
   it('renders AI context with movement, persisted source links and the exact disclaimer', async () => {
     getDashboard.mockResolvedValue(populatedDashboard)
     render(<App />)

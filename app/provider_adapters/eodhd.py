@@ -47,6 +47,7 @@ EODHD_SYMBOLS = {
     "DJI": "DJI.INDX",
 }
 EODHD_CURRENCIES = {"ASML": "EUR", "BMW": "EUR", **{ticker: "USD" for ticker in EODHD_SYMBOLS if ticker not in {"ASML", "BMW"}}}
+EODHD_INDEX_TICKERS = {"SPX", "IXIC", "DJI"}
 EODHD_API = "https://eodhd.com/api"
 
 
@@ -151,7 +152,11 @@ class EodhdMarketGateway:
                 as_of = _parse_datetime(data["date"])
             else:
                 return None
-            movement = data.get("change_p")
+            # EODHD documents the live change_p/previousClose fields for its
+            # live stock and ETF quote contract, but does not establish that
+            # same comparison baseline for indices. Keep an index price while
+            # withholding an unverified movement from this endpoint.
+            movement = None if ticker.upper() in EODHD_INDEX_TICKERS else data.get("change_p")
             change_percent = _decimal(movement) if movement is not None else None
             if price < 0:
                 return None

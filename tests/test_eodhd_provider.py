@@ -45,7 +45,7 @@ def test_symbol_mapping_and_realtime_normalization_return_catalogue_ticker():
     seen = []
     gateway = EodhdMarketGateway("secret", opener=fake_opener([{
         "close": "812.12345678", "currency": "EUR", "timestamp": 1792584000,
-        "change_p": "1.2500",
+        "previousClose": "802.093", "change_p": "1.2500",
     }], seen))
     result = gateway.fetch_market_data(["ASML"], None)
     assert isinstance(result, MarketDataResult)
@@ -135,16 +135,33 @@ def test_missing_key_is_reported_as_unavailable_without_http():
 def test_new_stock_and_index_mappings_use_eodhd_symbols_and_usd_currency():
     seen = []
     gateway = EodhdMarketGateway("secret", opener=fake_opener([
-        {"close": "225.50", "currency": "USD", "timestamp": 1792584000},
-        {"close": "45000", "currency": "USD", "timestamp": 1792584000},
+        {"close": "225.50", "currency": "USD", "timestamp": 1792584000, "previousClose": "222.72", "change_p": "1.2482"},
+        {"close": "45000", "currency": "USD", "timestamp": 1792584000, "previousClose": "44800", "change_p": "0.4464"},
     ], seen))
 
     results = gateway.fetch_market_data(["AAPL", "DJI"], None)
 
     assert [quote.ticker for quote in results.quotes] == ["AAPL", "DJI"]
     assert [quote.currency for quote in results.quotes] == ["USD", "USD"]
+    assert results.quotes[0].change_percent == Decimal("1.2482")
+    assert results.quotes[1].change_percent is None
     assert "/real-time/AAPL.US" in seen[0][0]
     assert "/real-time/DJI.INDX" in seen[1][0]
+
+
+def test_index_live_change_is_unavailable_when_previous_close_semantics_are_undocumented():
+    seen = []
+    gateway = EodhdMarketGateway("secret", opener=fake_opener([{
+        "close": "45000", "currency": "USD", "timestamp": 1792584000,
+        "previousClose": "44800", "change_p": "0.4464",
+    }], seen))
+
+    quote = gateway.fetch_market_data(["SPX"], None).quotes[0]
+
+    assert quote.price == Decimal("45000")
+    assert quote.as_of == datetime.fromtimestamp(1792584000, UTC)
+    assert quote.change_percent is None
+    assert "/real-time/GSPC.INDX" in seen[0][0]
 
 
 def test_default_gateway_is_configured_from_environment(monkeypatch):

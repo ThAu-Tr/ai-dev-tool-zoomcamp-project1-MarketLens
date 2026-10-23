@@ -162,9 +162,9 @@ function AssetCard({ asset, onManage }: { asset: Asset; onManage: () => void }) 
   return <article className="asset-card">
     <div className="asset-top"><div><span className="ticker">{asset.ticker}</span><span className="exchange">{asset.exchange}</span></div><span className={`chip ${asset.status === 'Owned' ? 'owned' : 'interested'}`}>{asset.status}</span></div>
     <h3>{asset.name}</h3><span className="asset-type">{asset.type}</span>
-    {asset.price === null || asset.currency === null || asset.changePercent === null || asset.asOf === null || asset.priceStatus === 'unavailable'
+    {asset.price === null || asset.currency === null || asset.asOf === null || asset.priceStatus === 'unavailable'
       ? <><div className="price-line"><strong>{asset.priceStatus === 'unavailable' ? 'Price unavailable' : 'Price not refreshed'}</strong></div><span className="as-of">{asset.priceStatus === 'unavailable' ? 'The provider did not return this symbol; previous data is retained.' : 'Price data will appear after the next refresh.'}</span></>
-      : <><div className="price-line"><strong>{money(asset.price, asset.currency)}</strong><span className={up ? 'positive movement' : 'negative movement'}>{up ? '↑' : '↓'} {pct(asset.changePercent)}</span></div><span className="as-of">{asset.priceStatus === 'stale' ? 'Stale price · ' : ''}As of {asset.asOf}</span></>}
+      : <><div className="price-line"><strong>{money(asset.price, asset.currency)}</strong>{asset.changePercent !== null && <span className={up ? 'positive movement' : 'negative movement'}>{up ? '↑' : '↓'} {pct(asset.changePercent)}</span>}</div><span className="as-of">{asset.priceStatus === 'stale' ? 'Stale price · ' : ''}{asset.changePercent === null ? 'Change comparison unavailable' : 'Change vs previous close'} · Quote as of {asset.asOf}</span></>}
     {asset.status === 'Owned' && <div className="holding-detail"><span>{quantity} active shares</span><span>Avg. {asset.currency ? money(Number(average), asset.currency) : 'Not available'}</span></div>}
     <button className="card-action" onClick={onManage}>Manage {asset.status === 'Owned' ? 'lots' : 'asset'} <span>→</span></button>
   </article>
