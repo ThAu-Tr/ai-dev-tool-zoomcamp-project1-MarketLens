@@ -88,6 +88,7 @@ Backend tests:
 ```powershell
 uv sync
 uv run pytest
+uv run pytest tests/integration
 ```
 
 Frontend tests and production build:
@@ -97,7 +98,11 @@ npm --prefix frontend run test
 npm --prefix frontend run build
 ```
 
-The current backend suite covers the completed dashboard, catalogue-search, and asset-creation slices. The frontend suite covers their API clients and UI states.
+`tests/integration/` is the separately runnable HTTP-to-database workflow suite. It covers adding and managing an asset before reading the dashboard, refreshing and persisting prices/news/AI context before reading the dashboard, and loading then revisiting a historical day. Run it with `uv run pytest tests/integration`; the full backend suite also includes it.
+
+The existing `tests/test_asset_creation.py`, `test_asset_ownership.py`, `test_purchase_lots.py`, `test_refresh.py`, `test_direct_news.py`, `test_ai_context.py`, and `test_timeline.py` contain additional API/service persistence and failure cases. Catalogue, industry, dashboard, and asset-removal tests likewise exercise HTTP routes against isolated SQLite. `test_eodhd_provider.py`, `test_marketaux.py`, and `test_provider_factory.py` focus on provider adapters and composition; they use fakes and do not establish live provider connectivity. Some service and repository logic is tested directly in `test_ai_context.py` and provider-specific tests.
+
+The integration suite uses an isolated in-memory SQLite database and deterministic fake providers, so it makes no live market, news, or AI calls. SQLite test results do not establish PostgreSQL compatibility or real provider integration. Those require the separate manual PostgreSQL/provider smoke checks described below.
 
 ## Local development and configuration
 
@@ -125,8 +130,6 @@ The frontend uses `VITE_API_BASE_URL` when it needs a non-default API origin. Pr
 ## Testing and quality
 
 The project adds tests with each completed vertical feature. Tests use deterministic local data and must not call live market, news, or AI services.
-
-// TODO: Add end-to-end integration-test instructions once the main MVP workflows are complete.
 
 ## Important design decisions
 

@@ -1,4 +1,4 @@
-from datetime import date, datetime, UTC
+from datetime import date, datetime, timedelta, UTC
 from decimal import Decimal
 
 from sqlalchemy import create_engine, select
@@ -64,7 +64,7 @@ def test_archive_read_skips_provider_and_is_allowed_after_window():
 def test_invalid_future_and_outside_window_rejected_without_provider_calls():
     factory = make_factory(); provider = HistoryProvider([]); client = build_client(factory, provider)
     assert client.get("/api/timeline?date=bad").status_code == 422
-    assert client.get("/api/timeline?date=2026-10-23").status_code == 400
+    assert client.get("/api/timeline", params={"date": (date.today() + timedelta(days=1)).isoformat()}).status_code == 400
     assert client.get("/api/timeline?date=2026-09-01").status_code == 403
     assert provider.calls == []
     with factory() as session: assert session.scalar(select(HistoricalDay)) is None
