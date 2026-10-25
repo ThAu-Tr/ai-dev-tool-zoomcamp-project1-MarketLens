@@ -10,7 +10,9 @@ describe('dashboardApi', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(dashboardApi.getDashboard()).resolves.toEqual(payload)
-    expect(fetchMock).toHaveBeenCalledWith('/api/dashboard')
+    expect(fetchMock).toHaveBeenCalledWith('/api/dashboard', expect.objectContaining({
+      headers: { traceparent: expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/) },
+    }))
   })
 
   it('surfaces a failed dashboard response as an API error', async () => {

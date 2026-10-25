@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Annotated
 from datetime import date
 
@@ -28,25 +29,45 @@ from app.services.refresh import ProviderUnavailableError, RefreshService
 from app.repositories.timeline import TimelineRepository
 from app.services.timeline import HistoricalDateOutOfRange, HistoricalProviderError, TimelineService
 from app.schemas import TimelineDayResponse
+from app.telemetry import DashboardTelemetry, DashboardTelemetryMiddleware, create_dashboard_telemetry, record_database_outcome
 
 
-def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
+def create_app(provider_gateway: ProviderGateway | None = None, telemetry: DashboardTelemetry | None = None) -> FastAPI:
     if provider_gateway is None:
         provider_gateway = create_default_provider_gateway()
+    telemetry_shutdown = None
+    if telemetry is None and os.getenv("OTEL_ENABLED", "false").lower() in {"1", "true", "yes"}:
+        telemetry, telemetry_shutdown = create_dashboard_telemetry()
     app = FastAPI(title="MarketLens API", openapi_url=None)
+    if telemetry is not None:
+        app.add_middleware(DashboardTelemetryMiddleware, telemetry=telemetry)
+    if telemetry_shutdown is not None:
+        app.router.on_shutdown.append(telemetry_shutdown)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_allowed_origins(),
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Content-Type", "Authorization"],
+        allow_headers=["Content-Type", "Authorization", "traceparent"],
     )
 
     @app.get("/api/dashboard", response_model=DashboardResponse)
     def get_dashboard(session: Session = Depends(get_session)) -> DashboardResponse:
-        try:
-            return DashboardService(DashboardRepository(session), provider_gateway).read_dashboard()
-        except RuntimeError as error:
-            raise HTTPException(status_code=500, detail=str(error)) from error
+        if telemetry is None:
+            try:
+                return DashboardService(DashboardRepository(session), provider_gateway).read_dashboard()
+            except RuntimeError as error:
+                raise HTTPException(status_code=500, detail=str(error)) from error
+        with telemetry.span("dashboard.repository.read") as span:
+            try:
+                dashboard = DashboardService(DashboardRepository(session), provider_gateway).read_dashboard()
+            except RuntimeError as error:
+                record_database_outcome(span, error)
+                raise HTTPException(status_code=500, detail=str(error)) from error
+            except Exception as error:
+                record_database_outcome(span, error)
+                raise
+            record_database_outcome(span)
+            return dashboard
 
     @app.get("/api/timeline", response_model=TimelineDayResponse)
     def get_timeline(date: Annotated[date, Query(description="Requested market day in YYYY-MM-DD format")], session: Session = Depends(get_session)) -> TimelineDayResponse:

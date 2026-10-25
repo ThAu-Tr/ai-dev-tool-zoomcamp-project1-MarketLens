@@ -19,6 +19,7 @@ vite.config.d.ts
 .env.*
 !.env.example
 !.env.compose.example
+!.env.observability.example
 .DS_Store
 .idea/
 .vscode/

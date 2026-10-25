@@ -161,6 +161,34 @@ Open [http://localhost:8000](http://localhost:8000). Compose waits for PostgreSQ
 
 The example environment file contains only local database and port settings. Market/news refresh and AI context need optional `EODHD_API_KEY`, `MARKETAUX_API_KEY`, and `OPENAI_API_KEY` values supplied by you in `.env.compose`; they are not required to start the application and no provider credentials are included in the image. `MARKETLENS_PORT` changes the host port (the app remains on container port 8000).
 
+### Local dashboard observability demo (issue #38)
+
+The optional LGTM stack instruments only the stored `GET /api/dashboard` journey. The React request creates a W3C `traceparent`; FastAPI extracts it and creates the server span, then a repository-boundary span covers the PostgreSQL read. Request count, latency, and a structured request log carry the same trace ID. Other routes and the normal Compose/Render deployment remain uninstrumented. The Collector config can receive future local signals for #39/#40, but this app currently exports only the dashboard journey.
+
+Telemetry is deliberately limited to service/environment, route template, method, status, duration, outcome, exception class, and trace/span IDs. It does not record headers, query strings, SQL text or parameters, exception messages, request/response bodies, asset or article identifiers, holdings, quantities, or values. The isolated local-only stack stores telemetry in local Docker volumes with 24-hour retention for traces, logs, and metrics; Grafana uses the local demo login `admin` / `admin`. No telemetry is sent to Render or a paid service.
+
+With Docker Compose installed, run these commands in PowerShell from the repository root:
+
+```powershell
+Copy-Item .env.observability.example .env.observability
+docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml up --build -d
+curl.exe -i http://localhost:8001/api/dashboard
+```
+
+The separate project has its own PostgreSQL data volume and starts with the migrated demo user, so the dashboard request returns `200` without provider calls. To produce a controlled database failure only in this isolated project, run:
+
+```powershell
+docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml stop db
+curl.exe -i http://localhost:8001/api/dashboard
+docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml start db
+```
+
+The second request returns `500` while the local database is stopped. Open [Grafana](http://localhost:3000), sign in with the local demo login, and use **Explore**: Prometheus query `marketlens_dashboard_requests_total` shows successes/failures and `marketlens_dashboard_duration_milliseconds_bucket` shows latency; Tempo can open the trace ID; Loki shows `dashboard_request` records. Each signal includes `trace_id`, so paste the same ID into Tempo and compare the matching Loki log and metric sample. The trace shows the `/api/dashboard` span and PostgreSQL read boundary; its status and exception class diagnose failure while the log provides the matching route/outcome, without storing database error text.
+
+Observed on the local demo stack: Prometheus contained one `200/success` sample and one `500/failure` sample; Tempo showed both dashboard traces with the `dashboard.repository.read` child span; Loki showed two `dashboard_request` records. The redacted trace IDs matched between all three signals (`961f8f98…` success, `a4c39f9a…` failure). The [local Grafana Explore UI](http://localhost:3000/explore) opens the provisioned data sources and shows the request metric, traces, and correlated logs.
+
+Stop the demo with `docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml down`. Add `--volumes` to remove its isolated data and telemetry. The stack is bound to localhost and must not be exposed as a production service.
+
 ### Render deployment
 
 The live application is [https://marketlens-dtc.onrender.com/](https://marketlens-dtc.onrender.com/). Its repository settings are:
