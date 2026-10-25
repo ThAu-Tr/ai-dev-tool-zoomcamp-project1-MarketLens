@@ -252,7 +252,8 @@ def test_failure_checkpoint_survives_restart_and_preserves_summary(session_facto
 def test_ai_failure_does_not_break_successful_price_news_refresh(session_factory, caplog):
     from tests.test_direct_news import FakeNewsProvider, news
     seed_asset(session_factory)
-    provider = FakeNewsProvider([news("SAP expands cloud services", ["SAP"])])
+    now = datetime.now(UTC)
+    provider = FakeNewsProvider([news("SAP expands cloud services", ["SAP"], published_at=now - timedelta(hours=1))], quote_time=now)
     calls = []
     def fail(task, facts):
         calls.append(task)
@@ -275,7 +276,8 @@ def test_manual_refresh_persists_and_reloads_source_linked_context(session_facto
 
     class RefreshWithAI(FakeNewsProvider):
         def __init__(self):
-            super().__init__([news("SAP expands cloud services", ["SAP"])])
+            now = datetime.now(UTC)
+            super().__init__([news("SAP expands cloud services", ["SAP"], published_at=now - timedelta(hours=1))], quote_time=now)
             self.ai_calls = []
 
         def generate_context(self, task, evidence):

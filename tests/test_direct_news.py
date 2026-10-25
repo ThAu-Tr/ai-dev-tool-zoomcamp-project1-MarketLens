@@ -8,13 +8,14 @@ from tests.test_refresh import session_factory  # noqa: F401 - pytest fixture
 
 
 class FakeNewsProvider:
-    def __init__(self, articles: list[NewsArticle], *, news_error: Exception | None = None) -> None:
+    def __init__(self, articles: list[NewsArticle], *, news_error: Exception | None = None, quote_time: datetime | None = None) -> None:
         self.articles = articles
         self.news_error = news_error
+        self.quote_time = quote_time or datetime(2026, 10, 21, 10, tzinfo=UTC)
         self.news_calls: list[tuple[list[str], datetime | None, list[str] | None]] = []
 
     def fetch_market_data(self, tickers: list[str], since: datetime | None) -> list[MarketQuote]:
-        return [MarketQuote(ticker, Decimal("101"), "EUR", Decimal("1"), datetime(2026, 10, 21, 10, tzinfo=UTC)) for ticker in tickers]
+        return [MarketQuote(ticker, Decimal("101"), "EUR", Decimal("1"), self.quote_time) for ticker in tickers]
 
     def fetch_news(self, tickers: list[str], since: datetime | None, industries: list[str] | None = None) -> list[NewsArticle]:
         self.news_calls.append((tickers, since, industries))
@@ -33,8 +34,8 @@ def seed_assets(session_factory) -> None:
         ])
 
 
-def news(headline: str, identifiers: list[str], *, url: str = "https://news.example/direct", identity: str | None = "wire-1", snippet: str | None = "Provider supplied context.") -> NewsArticle:
-    return NewsArticle(headline=headline, source="Wire", published_at=datetime(2026, 10, 21, 9, tzinfo=UTC), url=url, identifiers=identifiers, source_identity=identity, snippet=snippet)
+def news(headline: str, identifiers: list[str], *, url: str = "https://news.example/direct", identity: str | None = "wire-1", snippet: str | None = "Provider supplied context.", published_at: datetime | None = None) -> NewsArticle:
+    return NewsArticle(headline=headline, source="Wire", published_at=published_at or datetime(2026, 10, 21, 9, tzinfo=UTC), url=url, identifiers=identifiers, source_identity=identity, snippet=snippet)
 
 
 def test_refresh_saves_only_explicit_direct_matches_deduplicates_and_links_all_assets(session_factory):
