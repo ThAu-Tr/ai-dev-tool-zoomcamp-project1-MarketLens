@@ -81,7 +81,7 @@ Backend tests:
 
 ```powershell
 uv sync
-uv run pytest
+uv run pytest  # Runs backend unit and integration tests
 uv run pytest tests/integration
 ```
 
@@ -151,9 +151,9 @@ M4 evidence: [#20](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-Mark
 
 ## Deployment and CI/CD
 
-Public deployment and continuous integration are planned for M5; they are not part of the completed local M4 milestone.
+GitHub Actions runs the backend unit and integration suite, frontend tests, and production build on pull requests and pushes to `main`. Locally, run `uv sync && uv run pytest` for the backend and integration tests, then `npm ci --prefix frontend && npm --prefix frontend run test && npm --prefix frontend run build` for the frontend checks. These automated checks use local test data and do not require provider API keys.
 
-// TODO (M5): After implementing and verifying Docker, CI and deployment, document tested container startup, actual hosting and database services, required environment variables/secrets (without values), CI/CD checks, deployment workflow, and the working public application URL. None is yet implemented or verified in this README.
+// TODO (M5): After implementing and verifying deployment, document tested container startup, actual hosting and database services, required environment variables/secrets (without values), deployment workflow, and the working public application URL. None is yet implemented or verified in this README.
 
 
 ### AI context (issue #13)
