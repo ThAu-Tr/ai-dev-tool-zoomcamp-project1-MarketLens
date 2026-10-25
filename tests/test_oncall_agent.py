@@ -42,15 +42,15 @@ def event(status="firing", *, fingerprint="a1b2c3d4", starts_at="2026-10-25T19:0
     return {"status": status, "fingerprint": fingerprint, "startsAt": starts_at, "labels": labels}
 
 
-def test_stopped_database_is_started_once_and_resolution_rechecks_dashboard():
+def test_stopped_database_uses_the_single_restart_action_and_resolution_rechecks_dashboard():
     recovery, records = FakeRecovery(), []
     agent = OnCallAgent(recovery, records.append)
     agent.handle(event())
     agent.handle(event())
     agent.handle(event("resolved"))
     agent.handle(event("resolved"))
-    assert recovery.actions == ["start"]
-    assert records == ["oncall status=recovered action=start dashboard=healthy",
+    assert recovery.actions == ["restart"]
+    assert records == ["oncall status=recovered action=restart dashboard=healthy",
                        "oncall status=escalated reason=repeated_alert", "oncall status=resolved_verified",
                        "oncall status=duplicate_ignored"]
 
@@ -80,16 +80,20 @@ def test_healthy_database_and_failed_verification_escalate_without_retries():
     OnCallAgent(healthy, lambda _: None).handle(event())
     assert healthy.actions == []
 
+    unknown = FakeRecovery(DatabaseState("marketlens-observability", "db", "paused", "none"))
+    OnCallAgent(unknown, lambda _: None).handle(event())
+    assert unknown.actions == []
+
     failed = FakeRecovery(healthy=False)
     agent = OnCallAgent(failed, lambda _: None)
     agent.handle(event())
     agent.handle(event("resolved"))
-    assert failed.actions == ["start"]
+    assert failed.actions == ["restart"]
     assert failed.inspections == 1
 
     api_failed = FakeRecovery(dashboard=False)
     OnCallAgent(api_failed, lambda _: None).handle(event())
-    assert api_failed.actions == ["start"]
+    assert api_failed.actions == ["restart"]
 
 
 def test_unhealthy_action_failure_is_not_retried_for_same_alert_key():
@@ -118,9 +122,10 @@ def test_docker_adapter_uses_fixed_argv_without_shell(monkeypatch, tmp_path):
     monkeypatch.setattr(subprocess, "run", run)
     adapter = DockerComposeRecovery(tmp_path)
     assert adapter.inspect_database() == DatabaseState("marketlens-observability", "db", "exited", "none")
-    assert adapter.remediate_database("start")
+    assert adapter.remediate_database("restart")
+    assert not adapter.remediate_database("start")
     assert calls[0][0][-4:] == ["ps", "--all", "-q", "db"]
-    assert calls[2][0][-2:] == ["start", "db"]
+    assert calls[2][0][-2:] == ["restart", "db"]
     assert all(call[1]["shell"] is False and call[1]["timeout"] == 10 for call in calls)
     assert all("marketlens-observability" in call[0] or call[0][1] == "inspect" for call in calls)
 
@@ -145,8 +150,8 @@ def test_receiver_feed_poll_wakes_agent_and_escalates_repeated_delivery(monkeypa
         agent = OnCallAgent(recovery, records.append)
         cursor = poll_once(0, agent, f"http://127.0.0.1:{server.server_port}/agent/events")
         assert cursor == 2
-        assert recovery.actions == ["start"]
-        assert records == ["oncall status=recovered action=start dashboard=healthy",
+        assert recovery.actions == ["restart"]
+        assert records == ["oncall status=recovered action=restart dashboard=healthy",
                            "oncall status=escalated reason=repeated_alert"]
         assert "private-value" not in json.dumps(registry.events())
     finally:

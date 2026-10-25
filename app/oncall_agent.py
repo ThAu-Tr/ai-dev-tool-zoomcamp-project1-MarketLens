@@ -96,13 +96,12 @@ class OnCallAgent:
         if state.project != PROJECT or state.service != SERVICE:
             self.audit("oncall status=escalated reason=target_mismatch")
             return
-        if state.status in {"exited", "stopped"}:
-            action = "start"
-        elif state.status == "running" and state.health == "unhealthy":
-            action = "restart"
-        else:
+        stopped = state.status in {"exited", "stopped"}
+        unhealthy = state.status == "running" and state.health == "unhealthy"
+        if not (stopped or unhealthy):
             self.audit("oncall status=escalated reason=database_not_recoverable")
             return
+        action = "restart"
         try:
             acted = self.recovery.remediate_database(action)
             healthy = acted and self.recovery.wait_database_healthy()
@@ -143,13 +142,9 @@ class DockerComposeRecovery:
         return DatabaseState(*fields)
 
     def remediate_database(self, action: str) -> bool:
-        if action == "start":
-            verb = "start"
-        elif action == "restart":
-            verb = "restart"
-        else:
+        if action != "restart":
             return False
-        self._run(self.base + [verb, SERVICE])
+        self._run(self.base + ["restart", SERVICE])
         return True
 
     def wait_database_healthy(self) -> bool:

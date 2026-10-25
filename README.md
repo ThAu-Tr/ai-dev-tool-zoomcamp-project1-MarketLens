@@ -229,18 +229,18 @@ docker compose --project-name marketlens-observability --env-file .env.observabi
 curl.exe -i http://127.0.0.1:8001/api/dashboard
 ```
 
-Grafana's real dashboard availability notification reaches the receiver; the agent reads the sanitized event feed, verifies the fixed project/service labels and stopped state, then runs only `docker compose ... start db`. It checks the DB health and polls `/api/dashboard` for HTTP 200 before logging `oncall status=recovered`. Grafana later sends `resolved`; the agent rechecks the dashboard before logging `resolved_verified`. Keep the agent process running through recovery and resolution. The agent performs at most one action for each alert fingerprint/start time; unknown alerts, a healthy DB, duplicate events, or failed verification produce an escalation with no retry. It does not connect to Render or providers, accept shell input, or access any other Compose project. Audit output contains only allowlisted status/action values and no request or database payloads.
+Grafana's real dashboard availability notification reaches the receiver; the agent reads the sanitized event feed, verifies the fixed project/service labels and that the DB is stopped or running unhealthy, then runs the same single action in either case: `docker compose ... restart db`. Compose restart was verified to start the stopped isolated DB. The agent checks the DB health and polls `/api/dashboard` for HTTP 200 before logging `oncall status=recovered`. Grafana later sends `resolved`; the agent rechecks the dashboard before logging `resolved_verified`. Keep the agent process running through recovery and resolution. The agent performs at most one action for each alert fingerprint/start time; unknown alerts, a healthy DB, duplicate events, or failed verification produce an escalation with no retry. It does not connect to Render or providers, accept shell input, or access any other Compose project. Audit output contains only allowlisted status/action values and no request or database payloads.
 
-The receiver's GET `/agent/events?after=N` endpoint is read-only and returns only its redacted delivery registry. The first repeated firing delivery adds one redacted `repeated` feed event; the poller explicitly escalates it as `oncall status=escalated reason=repeated_alert` without taking a second action. Further repeats of that same firing are coalesced. Tests cover fixed-target start/restart, end-to-end receiver/feed/poller wake-up, unexpected labels, already-healthy state, repeated alerts, and failed health/dashboard verification. The real end-to-end chain requires Docker and the optional local observability stack; verify the firing and resolved `oncall` records in the terminal and the alert state under Grafana **Alerting → Alert rules**. Never stop a database outside this isolated project.
+The receiver's GET `/agent/events?after=N` endpoint is read-only and returns only its redacted delivery registry. The first repeated firing delivery adds one redacted `repeated` feed event; the poller explicitly escalates it as `oncall status=escalated reason=repeated_alert` without taking a second action. Further repeats of that same firing are coalesced. Tests cover the single fixed-target restart for stopped and unhealthy states, end-to-end receiver/feed/poller wake-up, unexpected labels, already-healthy state, repeated alerts, and failed health/dashboard verification. The real end-to-end chain requires Docker and the optional local observability stack; verify the firing and resolved `oncall` records in the terminal and the alert state under Grafana **Alerting → Alert rules**. Never stop a database outside this isolated project.
 
-Redacted automatic recovery evidence (2026-10-25 UTC; one allowed `start db`, no duplicate action):
+Redacted automatic recovery evidence (2026-10-25 UTC; one allowed `restart db`, no duplicate action):
 
 ```text
-19:53:00Z  dashboard fault injected only by stopping marketlens-observability/db; /api/dashboard returned HTTP 500
-19:53:14Z  alert_delivery status=firing fingerprint=0850647b23910719
-19:53:24Z  oncall status=recovered action=start dashboard=healthy; marketlens-observability/db healthy; /api/dashboard returned HTTP 200
-19:54:14Z  alert_delivery status=resolved fingerprint=0850647b23910719
-19:54:14Z  oncall status=resolved_verified
+20:08:40Z  dashboard fault injected only by stopping marketlens-observability/db; /api/dashboard returned HTTP 500
+20:09:14Z  alert_delivery status=firing fingerprint=0850647b23910719
+20:09:24Z  oncall status=recovered action=restart dashboard=healthy; marketlens-observability/db healthy; /api/dashboard returned HTTP 200
+20:09:44Z  alert_delivery status=resolved fingerprint=0850647b23910719
+20:09:46Z  oncall status=resolved_verified
 ```
 
 ### Render deployment
