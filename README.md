@@ -20,7 +20,7 @@ The asset picker searches a local catalogue rather than the provider's entire su
 
 There is no deployed demo, video, or screenshot yet.
 
-// TODO: Add a short demo recording or screenshots once the main MVP flow is complete and runnable end to end.
+// TODO (M5/M8): Create and link actual MarketLens demo screenshots or a short recording. No demo artifact exists yet; do not mark this complete until it can be opened and reviewed.
 
 ## MVP scope
 
@@ -127,7 +127,7 @@ npm --prefix frontend run dev
 
 The FastAPI backend permits configured frontend origins through `CORS_ALLOWED_ORIGINS` (default `http://localhost:5173`; see `.env.example`). If using another frontend origin, explicitly configure it. Keep EODHD, Marketaux, and OpenAI keys on the backend only. Apply `uv run alembic upgrade head` after updating the application code and before starting the backend.
 
-// TODO: Add a verified, reproducible full-stack local-development guide, including PostgreSQL provisioning, the FastAPI start command, frontend API-origin configuration, and CORS setup.
+// TODO (M8): Complete the local setup guide: add PostgreSQL installation/database/user provisioning and prerequisite steps, then independently verify the documented backend startup, Alembic migrations, frontend API URL/CORS configuration, and frontend startup from a clean checkout. Commands are documented but the complete clean-start procedure has not been verified.
 
 ## Testing and quality
 
@@ -147,13 +147,13 @@ The MVP supports one demo user, a bounded local instrument catalogue and provide
 
 M4 evidence: [#20](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/20) records the initial automated-suite verification (119 backend tests and 45 frontend tests, plus frontend build; original Windows rerun was blocked by an environment-level Python issue). [#21](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/21) records the separately runnable integration suite (4 passed), a subsequent backend suite (123 passed), and frontend/build checks. Later targeted QA for [#29](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/29) passed the weekend-quote fix; that issue also records a date-dependent full-suite AI-context test failure, so these are historical test snapshots, **not a claim that the latest full suite was rerun for #23**. The human accepted the local MVP in [#22](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/22).
 
-// TODO: Replace this section with deployed-system limitations and prioritized post-MVP work once the MVP feature backlog is complete.
+// TODO (M5/M8): After deployment, record limitations actually observed in the hosted application (availability, data/provider quotas, persistence, and hosting constraints as applicable); review and explicitly prioritize post-MVP issues #15/#16 and #30–#32. Current local-MVP limitations and links are documented, but deployment evidence and post-MVP ordering are not.
 
 ## Deployment and CI/CD
 
 Public deployment and continuous integration are planned for M5; they are not part of the completed local M4 milestone.
 
-// TODO: Document containerization, hosted services, required deployment secrets, CI checks, and the public demo URL after the productionization phase.
+// TODO (M5): After implementing and verifying Docker, CI and deployment, document tested container startup, actual hosting and database services, required environment variables/secrets (without values), CI/CD checks, deployment workflow, and the working public application URL. None is yet implemented or verified in this README.
 
 
 ### AI context (issue #13)
