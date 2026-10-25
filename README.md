@@ -189,6 +189,29 @@ Observed on the local demo stack: Prometheus contained one `200/success` sample 
 
 Stop the demo with `docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml down`. Add `--volumes` to remove its isolated data and telemetry. The stack is bound to localhost and must not be exposed as a production service.
 
+### Local dashboard availability alert (issue #39)
+
+The local Grafana rule `Dashboard unavailable` evaluates every 10 seconds and fires when at least one dashboard HTTP 5xx is observed in the rolling previous minute. It resolves after a full minute without a dashboard failure. Alert math uses a dedicated low-cardinality failure counter because the trace-correlated request counter has one unique trace ID per series and cannot produce a meaningful rolling increase. The local demo exports metrics every 5 seconds for a responsive demonstration. Grafana sends firing and resolved notifications to an internal-only webhook in the isolated Compose network. The receiver retains only the alert state, static rule name/severity/journey, a validated trace ID if a future rule supplies one, and the Grafana fingerprint/start time; repeated deliveries for the same alert transition are idempotent. It drops annotations, URLs, arbitrary labels, request data, and credentials. Its webhook contract is a local hand-off surface that a later on-call responder can consume.
+
+Start or rebuild the optional stack using the #38 commands above. Reproduce and recover without contacting external providers:
+
+```powershell
+docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml stop db
+curl.exe -i http://localhost:8001/api/dashboard
+docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml logs --since 2m alert-receiver
+docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml start db
+curl.exe -i http://localhost:8001/api/dashboard
+```
+
+The stopped database produces HTTP 500; the alert receiver logs one redacted `firing` event. After PostgreSQL is healthy, the dashboard returns HTTP 200 and Grafana delivers `resolved` after the failure leaves the one-minute window. In Grafana **Alerting → Alert rules**, verify `Dashboard unavailable` returns to **Normal**. The delivery contains the alert fingerprint and static journey/route/status class. To find the corresponding trace, open Loki in Explore and query `{service_name="marketlens-api"} |= "dashboard_request"`; select the matching time and use its configured trace link to Tempo. The alert threshold, delivery and recovery tests are in `tests/test_alert_receiver.py`. Do not stop a database outside this isolated observability project.
+
+Redacted local run evidence (same fingerprint for firing and recovery; repeated webhook posts produced no duplicate `alert_delivery` record):
+
+```text
+2026-10-25T19:35:15Z alert_delivery {"fingerprint":"0850647b23910719","labels":{"alert_id":"dashboard-availability","alertname":"Dashboard unavailable","http_request_method":"GET","http_response_status_class":"5xx","http_route":"/api/dashboard","journey":"dashboard","journey_outcome":"failure","severity":"critical"},"startsAt":"2026-10-25T19:34:40Z","status":"firing"}
+2026-10-25T19:35:45Z alert_delivery {"fingerprint":"0850647b23910719","labels":{"alert_id":"dashboard-availability","alertname":"Dashboard unavailable","http_request_method":"GET","http_response_status_class":"5xx","http_route":"/api/dashboard","journey":"dashboard","journey_outcome":"failure","severity":"critical"},"startsAt":"2026-10-25T19:34:40Z","status":"resolved"}
+```
+
 ### Render deployment
 
 The live application is [https://marketlens-dtc.onrender.com/](https://marketlens-dtc.onrender.com/). Its repository settings are:

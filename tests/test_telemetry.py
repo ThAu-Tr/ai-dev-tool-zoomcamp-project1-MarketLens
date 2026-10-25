@@ -75,7 +75,14 @@ def test_dashboard_success_correlates_trace_metrics_and_structured_log(client, t
     assert all(f"{span.context.trace_id:032x}" == trace_id for span in spans)
     assert all(span.attributes["journey.outcome"] == "success" for span in spans)
     metric_points = [point for metric in metric_reader.get_metrics_data().resource_metrics[0].scope_metrics[0].metrics for point in metric.data.data_points]
-    assert any(point.attributes["trace_id"] == trace_id and point.attributes["journey.outcome"] == "success" for point in metric_points)
+    assert any(point.attributes.get("trace_id") == trace_id and point.attributes["journey.outcome"] == "success" for point in metric_points)
+    failure_metric = next(
+        metric
+        for metric in metric_reader.get_metrics_data().resource_metrics[0].scope_metrics[0].metrics
+        if metric.name == "marketlens.dashboard.failures"
+    )
+    assert failure_metric.data.data_points[0].value == 0
+    assert "trace_id" not in failure_metric.data.data_points[0].attributes
     log = log_exporter.get_finished_logs()[0].log_record
     assert log.body == "dashboard_request"
     assert log.attributes["trace_id"] == trace_id
@@ -101,5 +108,15 @@ def test_dashboard_failure_records_safe_error_without_query_or_headers(client, t
     records = [str(failed_span.attributes), str(log.attributes), *(str(point.attributes) for point in metric_points)]
     assert all(secret not in " ".join(records) for secret in ("api-secret", "private-value", "private-token"))
     assert log.attributes["journey.outcome"] == "failure"
-    assert any(point.attributes["trace_id"] == trace_id and point.attributes["journey.outcome"] == "failure" for point in metric_points)
+    assert any(point.attributes.get("trace_id") == trace_id and point.attributes["journey.outcome"] == "failure" for point in metric_points)
+    failure_metric = next(
+        metric
+        for metric in metric_reader.get_metrics_data().resource_metrics[0].scope_metrics[0].metrics
+        if metric.name == "marketlens.dashboard.failures"
+    )
+    failure_point = failure_metric.data.data_points[0]
+    assert failure_point.value == 1
+    assert failure_point.attributes["journey.outcome"] == "failure"
+    assert failure_point.attributes["http.response.status_class"] == "5xx"
+    assert "trace_id" not in failure_point.attributes
 

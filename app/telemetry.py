@@ -30,6 +30,16 @@ class DashboardTelemetry:
         self.tracer = tracer
         self.logger = logger
         self.requests = meter.create_counter("marketlens.dashboard.requests", unit="{request}")
+        self.failures = meter.create_counter("marketlens.dashboard.failures", unit="{request}")
+        self.failure_attributes = {
+            "http.route": ROUTE,
+            "http.request.method": "GET",
+            "http.response.status_class": "5xx",
+            "journey.outcome": "failure",
+        }
+        # Register a zero-valued cumulative series before any failure occurs;
+        # Prometheus can then calculate increase() on the first real event.
+        self.failures.add(0, self.failure_attributes)
         self.duration = meter.create_histogram("marketlens.dashboard.duration", unit="ms")
 
     def span(self, name: str, *, context: Any = None):
@@ -54,6 +64,8 @@ class DashboardTelemetry:
         if trace_id:
             attributes["trace_id"] = trace_id
         self.requests.add(1, attributes)
+        if outcome == "failure":
+            self.failures.add(1, self.failure_attributes)
         self.duration.record(duration_ms, attributes)
         self.logger.emit(
             timestamp=time.time_ns(),
@@ -78,7 +90,12 @@ def create_dashboard_telemetry() -> tuple[DashboardTelemetry, Callable[[], None]
     traces.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True)))
     metrics = MeterProvider(
         resource=resource,
-        metric_readers=[PeriodicExportingMetricReader(OTLPMetricExporter(endpoint=endpoint, insecure=True))],
+        metric_readers=[
+            PeriodicExportingMetricReader(
+                OTLPMetricExporter(endpoint=endpoint, insecure=True),
+                export_interval_millis=max(1000, int(os.getenv("OTEL_METRIC_EXPORT_INTERVAL_MILLIS", "60000"))),
+            )
+        ],
     )
     logs = LoggerProvider(resource=resource)
     logs.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter(endpoint=endpoint, insecure=True)))

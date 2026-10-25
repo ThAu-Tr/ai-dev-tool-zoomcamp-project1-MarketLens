@@ -1,0 +1,38 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: dashboard-availability
+    folder: MarketLens
+    interval: 10s
+    rules:
+      - uid: dashboard-unavailable
+        title: Dashboard unavailable
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              expr: increase(marketlens_dashboard_failures_total{journey_outcome="failure"}[1m]) > 0
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+              range: false
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          alert_id: dashboard-availability
+          severity: critical
+          journey: dashboard
+        annotations:
+          summary: Dashboard request failed
+          description: A dashboard request returned HTTP 5xx within the previous minute. Use the route and time to find its correlated trace and request log.
+          runbook_url: http://localhost:3000/explore

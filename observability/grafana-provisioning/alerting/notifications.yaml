@@ -1,0 +1,21 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: marketlens-local-webhook
+    receivers:
+      - uid: marketlens-local-webhook
+        type: webhook
+        disableResolveMessage: false
+        settings:
+          url: http://alert-receiver:8080/webhook
+          httpMethod: POST
+          maxAlerts: '10'
+
+policies:
+  - orgId: 1
+    receiver: marketlens-local-webhook
+    group_by: [alertname, trace_id]
+    group_wait: 5s
+    group_interval: 30s
+    repeat_interval: 1h
