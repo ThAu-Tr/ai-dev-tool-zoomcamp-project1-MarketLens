@@ -41,11 +41,12 @@ def test_alert_delivery_trigger_recovery_and_duplicate_suppression(caplog) -> No
 
     total, accepted = registry.accept(notification("firing"))
     assert (total, accepted) == (1, 1)
+    assert registry.accept(notification("firing")) == (1, 1)
     assert registry.accept(notification("firing")) == (1, 0)
 
     assert registry.accept(notification("resolved")) == (1, 1)
     assert registry.accept(notification("resolved")) == (1, 0)
-    assert [event["status"] for event in registry.events()] == ["firing", "resolved"]
+    assert [event["status"] for event in registry.events()] == ["firing", "repeated", "resolved"]
 
     delivered = " ".join(caplog.messages)
     assert "1234567890abcdef1234567890abcdef" in delivered

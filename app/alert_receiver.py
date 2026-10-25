@@ -24,11 +24,12 @@ SAFE_LABEL_VALUES = {
 
 
 class DeliveryRegistry:
-    """Keep one redacted record per alert transition; repeated deliveries are idempotent."""
+    """Keep redacted transitions and surface one repeat signal per firing alert."""
 
     def __init__(self) -> None:
         self._lock = Lock()
         self._seen: set[tuple[str, str, str]] = set()
+        self._repeated: set[tuple[str, str, str]] = set()
         self._events: list[dict[str, Any]] = []
 
     def accept(self, payload: dict[str, Any]) -> tuple[int, int]:
@@ -60,9 +61,6 @@ class DeliveryRegistry:
                 ):
                     continue
                 key = (fingerprint, status, starts_at)
-                if key in self._seen:
-                    continue
-                self._seen.add(key)
                 safe_labels = {
                     key: labels[key]
                     for key, allowed in SAFE_LABEL_VALUES.items()
@@ -71,6 +69,16 @@ class DeliveryRegistry:
                 trace_id = labels.get("trace_id")
                 if isinstance(trace_id, str) and re.fullmatch(r"[0-9a-fA-F]{32}", trace_id):
                     safe_labels["trace_id"] = trace_id
+                if key in self._seen:
+                    if status == "firing" and key not in self._repeated:
+                        self._repeated.add(key)
+                        event = {"status": "repeated", "fingerprint": fingerprint,
+                                 "startsAt": starts_at, "labels": safe_labels}
+                        self._events.append(event)
+                        logger.info("alert_delivery %s", json.dumps(event, sort_keys=True, separators=(",", ":")))
+                        new_count += 1
+                    continue
+                self._seen.add(key)
                 event = {"status": status, "fingerprint": fingerprint, "startsAt": starts_at, "labels": safe_labels}
                 self._events.append(event)
                 logger.info("alert_delivery %s", json.dumps(event, sort_keys=True, separators=(",", ":")))

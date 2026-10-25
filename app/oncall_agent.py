@@ -37,7 +37,7 @@ class RecoveryAdapter(Protocol):
 
 
 def _event_key(event: dict[str, Any]) -> tuple[str, str] | None:
-    if event.get("status") not in {"firing", "resolved"}:
+    if event.get("status") not in {"firing", "resolved", "repeated"}:
         return None
     fingerprint, starts_at = event.get("fingerprint"), event.get("startsAt")
     labels = event.get("labels")
@@ -70,6 +70,9 @@ class OnCallAgent:
             self.audit("oncall status=escalated reason=unapproved_alert")
             return
         status = event["status"]
+        if status == "repeated":
+            self.audit("oncall status=escalated reason=repeated_alert")
+            return
         if status == "resolved":
             if key in self._resolved:
                 self.audit("oncall status=duplicate_ignored")
@@ -82,7 +85,7 @@ class OnCallAgent:
                 self.audit("oncall status=escalated reason=dashboard_unhealthy")
             return
         if key in self._attempted:
-            self.audit("oncall status=duplicate_ignored")
+            self.audit("oncall status=escalated reason=repeated_alert")
             return
         self._attempted.add(key)
         try:

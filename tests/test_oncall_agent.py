@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from app.oncall_agent import DatabaseState, DockerComposeRecovery, OnCallAgent
+import json
+import threading
+from http.server import ThreadingHTTPServer
+from urllib.request import Request, urlopen
+
+from app import alert_receiver
+from app.alert_receiver import AlertHandler, DeliveryRegistry
+from app.oncall_agent import DatabaseState, DockerComposeRecovery, OnCallAgent, poll_once
 
 
 class FakeRecovery:
@@ -44,7 +51,7 @@ def test_stopped_database_is_started_once_and_resolution_rechecks_dashboard():
     agent.handle(event("resolved"))
     assert recovery.actions == ["start"]
     assert records == ["oncall status=recovered action=start dashboard=healthy",
-                       "oncall status=duplicate_ignored", "oncall status=resolved_verified",
+                       "oncall status=escalated reason=repeated_alert", "oncall status=resolved_verified",
                        "oncall status=duplicate_ignored"]
 
 
@@ -116,3 +123,33 @@ def test_docker_adapter_uses_fixed_argv_without_shell(monkeypatch, tmp_path):
     assert calls[2][0][-2:] == ["start", "db"]
     assert all(call[1]["shell"] is False and call[1]["timeout"] == 10 for call in calls)
     assert all("marketlens-observability" in call[0] or call[0][1] == "inspect" for call in calls)
+
+
+def test_receiver_feed_poll_wakes_agent_and_escalates_repeated_delivery(monkeypatch):
+    registry = DeliveryRegistry()
+    monkeypatch.setattr(alert_receiver, "registry", registry)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), AlertHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        alert = event()
+        alert["labels"]["authorization"] = "Bearer private-value"
+        payload = json.dumps({"status": "firing", "alerts": [alert]}).encode()
+        post_url = f"http://127.0.0.1:{server.server_port}/webhook"
+        for _ in range(2):
+            request = Request(post_url, data=payload, headers={"Content-Type": "application/json"})
+            with urlopen(request) as response:
+                assert response.status == 202
+
+        recovery, records = FakeRecovery(), []
+        agent = OnCallAgent(recovery, records.append)
+        cursor = poll_once(0, agent, f"http://127.0.0.1:{server.server_port}/agent/events")
+        assert cursor == 2
+        assert recovery.actions == ["start"]
+        assert records == ["oncall status=recovered action=start dashboard=healthy",
+                           "oncall status=escalated reason=repeated_alert"]
+        assert "private-value" not in json.dumps(registry.events())
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
