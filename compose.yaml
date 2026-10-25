@@ -15,6 +15,7 @@ services:
       start_period: 5s
 
   app:
+    container_name: marketlens
     build: .
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-marketlens}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-marketlens}
