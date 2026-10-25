@@ -2,7 +2,7 @@
 
 MarketLens is a lightweight investment-monitoring application for everyday investors who want to follow stocks, ETFs, and major indices in one place. It combines price movement with relevant news and carefully qualified AI context so users can understand possible market context without receiving investment advice.
 
-> **Project status:** M4 local MVP accepted ([human acceptance #22](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/22)); milestone documentation is tracked in [#23](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/23). M5 (containerization, CI/CD, deployment) comes next.
+> **Project status:** M4 local MVP accepted ([human acceptance #22](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/22)); milestone documentation is tracked in [#23](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/23). The M5 Docker deployment is live at [marketlens-dtc.onrender.com](https://marketlens-dtc.onrender.com/); deployment checks are summarized below as owner-reported.
 
 ## The problem
 
@@ -18,9 +18,7 @@ The asset picker searches a local catalogue rather than the provider's entire su
 
 ## Demo
 
-There is no deployed demo, video, or screenshot yet.
-
-// TODO (M5/M8): Create and link actual MarketLens demo screenshots or a short recording. No demo artifact exists yet; do not mark this complete until it can be opened and reviewed.
+Try the live application at [https://marketlens-dtc.onrender.com/](https://marketlens-dtc.onrender.com/). A separate video or screenshot walkthrough is not currently linked.
 
 ## MVP scope
 
@@ -147,7 +145,7 @@ The MVP supports one demo user, a bounded local instrument catalogue and provide
 
 M4 evidence: [#20](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/20) records the initial automated-suite verification (119 backend tests and 45 frontend tests, plus frontend build; original Windows rerun was blocked by an environment-level Python issue). [#21](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/21) records the separately runnable integration suite (4 passed), a subsequent backend suite (123 passed), and frontend/build checks. Later targeted QA for [#29](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/29) passed the weekend-quote fix; that issue also records a date-dependent full-suite AI-context test failure, so these are historical test snapshots, **not a claim that the latest full suite was rerun for #23**. The human accepted the local MVP in [#22](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/22).
 
-// TODO (M5/M8): After deployment, record limitations actually observed in the hosted application (availability, data/provider quotas, persistence, and hosting constraints as applicable); review and explicitly prioritize post-MVP issues #15/#16 and #30–#32. Current local-MVP limitations and links are documented, but deployment evidence and post-MVP ordering are not.
+The project owner reports manually checking the hosted application's persistence, deployment workflow, and rollback. Review and explicitly prioritize post-MVP issues #15/#16 and #30–#32 remains future work.
 
 ## Run with Docker Compose
 
@@ -165,18 +163,34 @@ The example environment file contains only local database and port settings. Mar
 
 ### Render deployment
 
-Create a **Web Service** from this repository and select **Docker** as the runtime. Leave the Dockerfile path as `./Dockerfile` and the Docker build context as the repository root. Render supplies `PORT`; the container listens on that value (and uses `8000` when it is absent). The container applies `alembic upgrade head` before starting the web server.
+The live application is [https://marketlens-dtc.onrender.com/](https://marketlens-dtc.onrender.com/). Its repository settings are:
 
-Create a Neon PostgreSQL database and set the web service's `DATABASE_URL` environment variable to its connection string. Both `postgres://` and `postgresql://` URLs are adapted to the installed `psycopg` driver; keep Neon’s `sslmode=require` query parameter. Add `CORS_ALLOWED_ORIGINS` with the exact deployed frontend origin if the frontend is hosted separately. Provider keys are optional for starting the service: `EODHD_API_KEY`, `MARKETAUX_API_KEY`, and `OPENAI_API_KEY`.
+- **Service type:** Web Service
+- **Runtime:** Docker
+- **Branch:** `main`
+- **Auto-deploy:** After CI checks pass
+- **Root directory:** repository root (leave blank)
+- **Dockerfile path:** `./Dockerfile`
+- **Docker build context:** repository root (`.`)
+- **Port:** use Render's injected `PORT`; the image defaults to `8000` for local runs. Do not set `PORT` manually in Render.
 
-For a persistence check, add an asset to the watchlist and, if marking it Owned, save one or more purchase lots. Stop and restart with the commands above, then confirm the asset and lots remain. `docker compose --env-file .env.compose logs app` shows startup and migration output. This local container setup does not publish the app to the internet.
+The Docker startup command runs `alembic upgrade head` before starting Uvicorn. For deployment, provide a Neon PostgreSQL connection string in the required `DATABASE_URL` environment variable and retain its `sslmode=require` option. The app accepts Neon `postgres://` and `postgresql://` URL schemes and adapts them to the installed `psycopg` driver.
+
+Configure these environment variables in the Render service:
+
+- **Required:** `DATABASE_URL`
+- **Optional provider features:** `EODHD_API_KEY` (market prices), `MARKETAUX_API_KEY` (news), and `OPENAI_API_KEY` (AI context). `MARKETAUX_USER_AGENT` and `OPENAI_MODEL` can override their application defaults.
+- **Separate frontend only:** `CORS_ALLOWED_ORIGINS`, set to the exact frontend origin if it is hosted on a different origin. The current app serves its frontend and API from the same service.
+
+The project owner reports manually verifying deployment through CI/CD, saved watchlist data across a restart, and a Render dashboard rollback. This documentation update did not independently exercise the live service. To check it, open the URL above, confirm the page title is “MarketLens | Market context,” add a watchlist asset, then revisit it after a service restart. GitHub Actions checks backend tests, frontend tests, and the production frontend build on pull requests and pushes to `main`.
+
+To roll back, open the service's **Deploys** page in the [Render Dashboard](https://dashboard.render.com/), choose a previous successful deploy, and select **Rollback**. A dashboard rollback disables automatic deploys; re-enable them from the service **Settings** page when ready. A code rollback does not roll back Neon schema migrations or database data, so confirm the selected application version is compatible with the current database schema. See [Render's rollback guide](https://render.com/docs/rollbacks).
+
+For local Compose persistence checks, add an asset to the watchlist and, if marking it Owned, save purchase lots. Stop and restart with the Compose commands above, then confirm the asset and lots remain. `docker compose --env-file .env.compose logs app` shows startup and migration output. This local setup does not publish the app to the internet.
 
 ## Deployment and CI/CD
 
 GitHub Actions runs the backend unit and integration suite, frontend tests, and production build on pull requests and pushes to `main`. Locally, run `uv sync && uv run pytest` for the backend and integration tests, then `npm ci --prefix frontend && npm --prefix frontend run test && npm --prefix frontend run build` for the frontend checks. These automated checks use local test data and do not require provider API keys.
-
-// TODO (M5): After implementing and verifying deployment, document actual hosting, deployment workflow, and the working public application URL. None is yet implemented or verified in this README.
-
 
 ### AI context (issue #13)
 
