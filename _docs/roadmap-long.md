@@ -322,12 +322,12 @@ Response
 
 ## 11. Containerize the application
 
-- [ ] Create the required Dockerfile(s).
-- [ ] Make sure the application runs in containers.
-- [ ] Add Docker Compose only if useful.
-- [ ] Move configuration into environment variables.
+- [X] Create the required Dockerfile(s).
+- [X] Make sure the application runs in containers.
+- [X] Add Docker Compose only if useful.
+- [X] Move configuration into environment variables.
 - [ ] Verify the complete app starts from a clean environment.
-- [ ] Document container startup.
+- [X] Document container startup.
 
 ### Output
 - Dockerfile(s)
@@ -341,11 +341,11 @@ Response
 
 ## 12. Set up CI
 
-- [ ] Create the CI workflow.
-- [ ] Install dependencies automatically.
-- [ ] Run relevant tests automatically.
-- [ ] Make CI fail when tests fail.
-- [ ] Keep the pipeline minimal.
+- [X] Create the CI workflow.
+- [X] Install dependencies automatically.
+- [X] Run relevant tests automatically.
+- [X] Make CI fail when tests fail.
+- [X] Keep the pipeline minimal.
 
 ### Output
 - GitHub Actions workflow or equivalent
@@ -357,15 +357,15 @@ Response
 
 ## 13. Deploy the application
 
-- [ ] Choose the simplest acceptable hosting solution.
-- [ ] Configure the production environment.
-- [ ] Configure the production database if different.
-- [ ] Deploy the application.
-- [ ] Verify the deployed frontend.
-- [ ] Verify the deployed API.
-- [ ] Verify persistence.
-- [ ] Verify the main user workflow.
-- [ ] Add the public URL to the README.
+- [X] Choose the simplest acceptable hosting solution.
+- [X] Configure the production environment.
+- [X] Configure the production database if different.
+- [X] Deploy the application.
+- [X] Verify the deployed frontend.
+- [X] Verify the deployed API.
+- [X] Verify persistence.
+- [X] Verify the main user workflow.
+- [X] Add the public URL to the README.
 
 ### Output
 - Publicly accessible application
@@ -377,10 +377,10 @@ Response
 
 ## 14. Add CD where useful
 
-- [ ] Configure deployment after successful CI.
-- [ ] Avoid automatic deployment if tests fail.
-- [ ] Document how deployment works.
-- [ ] Keep the pipeline as simple as possible.
+- [X] Configure deployment after successful CI.
+- [X] Avoid automatic deployment if tests fail.
+- [X] Document how deployment works.
+- [X] Keep the pipeline as simple as possible.
 
 ### Output
 - Automated or clearly documented deployment pipeline
@@ -545,11 +545,11 @@ Good moments to capture:
 
 ### After Phase 3
 
-- [ ] Add Docker instructions.
-- [ ] Add deployment instructions.
-- [ ] Add CI/CD description.
-- [ ] Add public URL.
-- [ ] Add one deployment-related AI example if useful.
+- [X] Add Docker instructions.
+- [X] Add deployment instructions.
+- [X] Add CI/CD description.
+- [X] Add public URL.
+- [X] Add one deployment-related AI example if useful.
 
 ### After Phase 4
 
@@ -618,7 +618,7 @@ Final checklist:
 - [ ] **M2 — Prototype Validated:** Core MVP works with a mock frontend.
 - [ ] **M3 — Backlog Ready:** Validated MVP translated into executable GitHub Issues.
 - [X] **M4 — Local MVP Complete:** Full-stack MVP locally accepted in #22 with persistence and documented test evidence in #20/#21/#23 (see noted test limitation).
-- [ ] **M5 — Public MVP Complete:** Application is containerized, tested and deployed.
+- [X] **M5 — Public MVP Complete:** Docker Compose, CI, public Render/Neon deployment and rollback were manually accepted (#33–#35); see #36 for milestone evidence.
 - [ ] **M6 — Production Evidence Complete:** Operations, security and audit requirements are covered.
 - [ ] **M7 — Optional Extensions Complete:** Week 5 / criterion 12 added if worthwhile.
 - [ ] **M8 — Submission Ready:** Documentation and reproducibility have been verified.
