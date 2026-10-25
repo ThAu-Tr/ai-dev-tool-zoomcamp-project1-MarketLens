@@ -249,13 +249,13 @@ Do not artificially separate development into frontend/backend/database phases.
 
 As features require persistence:
 
-- [ ] Implement the database schema.
-- [ ] Connect backend operations to the database.
-- [ ] Add database setup instructions.
-- [ ] Use configurable connection settings.
-- [ ] Separate development/test/production configuration where appropriate.
-- [ ] Avoid hardcoding environment-specific database URLs.
-- [ ] Document migrations or initialization if relevant.
+- [X] Implement the database schema.
+- [X] Connect backend operations to the database.
+- [X] Add database setup instructions.
+- [X] Use configurable connection settings.
+- [X] Separate development/test/production configuration where appropriate.
+- [X] Avoid hardcoding environment-specific database URLs.
+- [X] Document migrations or initialization if relevant.
 
 ### Output
 - Working persistent database layer
@@ -272,10 +272,10 @@ Do not postpone testing until the end.
 
 For relevant features:
 
-- [ ] Add backend unit tests.
-- [ ] Add frontend/component tests where useful.
-- [ ] Test validation and failure cases.
-- [ ] Keep tests runnable locally.
+- [X] Add backend unit tests.
+- [X] Add frontend/component tests where useful.
+- [X] Test validation and failure cases.
+- [X] Keep tests runnable locally.
 - [ ] Maintain a passing test suite.
 
 Focus effort on important behavior rather than maximizing test count.
