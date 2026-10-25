@@ -25,10 +25,14 @@ load_local_env()
 
 
 def database_url() -> str:
-    """Return the configured database URL without embedding environment secrets."""
+    """Return a SQLAlchemy URL using the installed PostgreSQL driver."""
     value = os.getenv("DATABASE_URL")
     if not value:
         raise RuntimeError("DATABASE_URL must be set before starting the MarketLens backend.")
+    if value.startswith("postgres://"):
+        value = "postgresql+psycopg://" + value.removeprefix("postgres://")
+    elif value.startswith("postgresql://"):
+        value = "postgresql+psycopg://" + value.removeprefix("postgresql://")
     return value
 
 

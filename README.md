@@ -163,6 +163,12 @@ Open [http://localhost:8000](http://localhost:8000). Compose waits for PostgreSQ
 
 The example environment file contains only local database and port settings. Market/news refresh and AI context need optional `EODHD_API_KEY`, `MARKETAUX_API_KEY`, and `OPENAI_API_KEY` values supplied by you in `.env.compose`; they are not required to start the application and no provider credentials are included in the image. `MARKETLENS_PORT` changes the host port (the app remains on container port 8000).
 
+### Render deployment
+
+Create a **Web Service** from this repository and select **Docker** as the runtime. Leave the Dockerfile path as `./Dockerfile` and the Docker build context as the repository root. Render supplies `PORT`; the container listens on that value (and uses `8000` when it is absent). The container applies `alembic upgrade head` before starting the web server.
+
+Create a Neon PostgreSQL database and set the web service's `DATABASE_URL` environment variable to its connection string. Both `postgres://` and `postgresql://` URLs are adapted to the installed `psycopg` driver; keep Neon’s `sslmode=require` query parameter. Add `CORS_ALLOWED_ORIGINS` with the exact deployed frontend origin if the frontend is hosted separately. Provider keys are optional for starting the service: `EODHD_API_KEY`, `MARKETAUX_API_KEY`, and `OPENAI_API_KEY`.
+
 For a persistence check, add an asset to the watchlist and, if marking it Owned, save one or more purchase lots. Stop and restart with the commands above, then confirm the asset and lots remain. `docker compose --env-file .env.compose logs app` shows startup and migration output. This local container setup does not publish the app to the internet.
 
 ## Deployment and CI/CD
