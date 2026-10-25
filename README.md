@@ -149,11 +149,27 @@ M4 evidence: [#20](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-Mark
 
 // TODO (M5/M8): After deployment, record limitations actually observed in the hosted application (availability, data/provider quotas, persistence, and hosting constraints as applicable); review and explicitly prioritize post-MVP issues #15/#16 and #30–#32. Current local-MVP limitations and links are documented, but deployment evidence and post-MVP ordering are not.
 
+## Run with Docker Compose
+
+With Docker Desktop (including Compose) installed, start the app and PostgreSQL from the repository root:
+
+```powershell
+Copy-Item .env.compose.example .env.compose
+# Edit .env.compose and replace the example local database password.
+docker compose --env-file .env.compose up --build
+```
+
+Open [http://localhost:8000](http://localhost:8000). Compose waits for PostgreSQL readiness, and the app applies Alembic migrations before starting. The `postgres_data` volume keeps the watchlist, purchase lots, and other stored data across app restarts. Stop with `Ctrl+C`, then run `docker compose --env-file .env.compose down`; this preserves the database volume. To remove the stored database as well, run `docker compose --env-file .env.compose down --volumes`.
+
+The example environment file contains only local database and port settings. Market/news refresh and AI context need optional `EODHD_API_KEY`, `MARKETAUX_API_KEY`, and `OPENAI_API_KEY` values supplied by you in `.env.compose`; they are not required to start the application and no provider credentials are included in the image. `MARKETLENS_PORT` changes the host port (the app remains on container port 8000).
+
+For a persistence check, add an asset to the watchlist and, if marking it Owned, save one or more purchase lots. Stop and restart with the commands above, then confirm the asset and lots remain. `docker compose --env-file .env.compose logs app` shows startup and migration output. This local container setup does not publish the app to the internet.
+
 ## Deployment and CI/CD
 
 GitHub Actions runs the backend unit and integration suite, frontend tests, and production build on pull requests and pushes to `main`. Locally, run `uv sync && uv run pytest` for the backend and integration tests, then `npm ci --prefix frontend && npm --prefix frontend run test && npm --prefix frontend run build` for the frontend checks. These automated checks use local test data and do not require provider API keys.
 
-// TODO (M5): After implementing and verifying deployment, document tested container startup, actual hosting and database services, required environment variables/secrets (without values), deployment workflow, and the working public application URL. None is yet implemented or verified in this README.
+// TODO (M5): After implementing and verifying deployment, document actual hosting, deployment workflow, and the working public application URL. None is yet implemented or verified in this README.
 
 
 ### AI context (issue #13)

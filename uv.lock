@@ -167,13 +167,13 @@ dependencies = [
     { name = "fastapi" },
     { name = "psycopg", extra = ["binary"] },
     { name = "sqlalchemy" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "httpx" },
     { name = "pytest" },
-    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -182,13 +182,13 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.141,<1" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "pytest", specifier = ">=8.3,<9" },
-    { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
 [[package]]

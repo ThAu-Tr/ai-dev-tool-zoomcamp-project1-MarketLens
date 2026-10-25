@@ -5,6 +5,8 @@ from datetime import date
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -138,6 +140,12 @@ def create_app(provider_gateway: ProviderGateway | None = None) -> FastAPI:
         if industry is None:
             raise HTTPException(status_code=404, detail="The requested industry was not found.")
         return industry
+
+    # The production container copies the built React bundle here. Keeping the
+    # mount optional preserves the API-only local development workflow.
+    frontend_dist = Path(__file__).resolve().parent.parent / "frontend_dist"
+    if frontend_dist.is_dir():
+        app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 
     return app
 
