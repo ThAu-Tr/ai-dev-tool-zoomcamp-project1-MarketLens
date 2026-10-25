@@ -74,6 +74,28 @@ def test_refresh_preserves_values_when_provider_fails(session_factory):
     with session_factory() as session:
         assert session.get(Asset, "sap").price == Decimal("100.000000")
         assert session.get(RefreshState, 1).status == "unavailable"
+    dashboard = build_client(session_factory, provider).get("/api/dashboard").json()
+    asset = dashboard["assets"][0]
+    assert asset["price"] == 100
+    assert asset["asOf"] == "2026-10-20T09:00:00Z"
+    assert asset["priceStatus"] == "stale"
+
+
+def test_weekend_first_refresh_persists_last_available_quote_as_of_observation(session_factory):
+    with session_factory.begin() as session:
+        session.add(DemoUser(id=1, identifier="demo-user"))
+        session.add(Asset(id="sap", user_id=1, name="SAP", ticker="SAP", exchange="XETRA", asset_type="Stock", status="Owned", price=None, currency=None, change_percent=None, as_of=None, industries=[]))
+    friday_quote = MarketQuote("SAP", Decimal("105.50"), "EUR", Decimal("5.5"), datetime(2026, 10, 23, tzinfo=UTC))
+    provider = FakeMarketProvider([friday_quote])
+
+    response = build_client(session_factory, provider).post("/api/refresh")
+
+    assert response.status_code == 200
+    asset = build_client(session_factory, provider).get("/api/dashboard").json()["assets"][0]
+    assert asset["price"] == 105.5
+    assert asset["changePercent"] == 5.5
+    assert asset["asOf"] == "2026-10-23T00:00:00Z"
+    assert asset["priceStatus"] == "current"
 
 
 def test_incomplete_provider_result_is_unavailable_and_does_not_write(session_factory):

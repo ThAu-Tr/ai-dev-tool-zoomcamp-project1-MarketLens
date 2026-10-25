@@ -41,7 +41,7 @@ class DashboardService:
                     asOf=_as_utc(asset.as_of) if asset.as_of else None,
                     lots=[LotResponse(id=lot.id, quantity=_decimal_text(lot.quantity), purchasePrice=_decimal_text(lot.purchase_price), purchaseDate=lot.purchase_date) for lot in asset.lots],
                     industries=asset.industries,
-                    priceStatus=("unavailable" if refresh_state and asset.ticker.upper() in (refresh_state.unavailable_tickers or []) else (refresh_state.status if refresh_state and refresh_state.status != "never" else ("current" if asset.price is not None and asset.as_of is not None else "never"))),
+                    priceStatus=_price_status(asset, refresh_state),
                 )
                 for asset in assets
             ],
@@ -85,3 +85,13 @@ def _timestamp_text(value: datetime) -> str:
 
 def _decimal_text(value: object) -> str:
     return format(value, "f")
+
+
+def _price_status(asset, refresh_state) -> str:
+    has_quote = asset.price is not None and asset.as_of is not None
+    if refresh_state and asset.ticker.upper() in (refresh_state.unavailable_tickers or []):
+        # A failed refresh must not hide a previously stored observation.
+        return "stale" if has_quote else "unavailable"
+    if refresh_state and refresh_state.status != "never":
+        return refresh_state.status
+    return "current" if has_quote else "never"

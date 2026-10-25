@@ -65,7 +65,7 @@ describe('dashboard', () => {
     const stock = populatedDashboard.assets[0]
     getDashboard.mockResolvedValue({ ...populatedDashboard, assets: [
       { ...stock, id: 'aapl', ticker: 'AAPL', name: 'Apple Inc.', type: 'Stock', price: 225.5, currency: 'USD', changePercent: 1.25 },
-      { ...stock, id: 'voo', ticker: 'VOO', name: 'Vanguard S&P 500 ETF', type: 'ETF', status: 'Interested', price: 540, currency: 'USD', changePercent: -0.5, lots: [] },
+      { ...stock, id: 'voo', ticker: 'VOO', name: 'Vanguard S&P 500 ETF', type: 'ETF', status: 'Interested', price: 540, currency: 'USD', changePercent: -0.5, priceStatus: 'stale', lots: [] },
       { ...stock, id: 'spx', ticker: 'SPX', name: 'S&P 500', type: 'Index', status: 'Interested', price: 45000, currency: 'USD', changePercent: null, lots: [] },
     ] })
 
@@ -76,8 +76,9 @@ describe('dashboard', () => {
     expect(within(stockCard).getByText('Change vs previous close · Quote as of 2026-10-20T09:45:00Z')).toBeInTheDocument()
 
     const etfCard = screen.getByText('Vanguard S&P 500 ETF').closest('article')!
+    expect(within(etfCard).getByText('$540.00')).toBeInTheDocument()
     expect(within(etfCard).getByText('↓ -0.50%')).toBeInTheDocument()
-    expect(within(etfCard).getByText(/Change vs previous close · Quote as of/)).toBeInTheDocument()
+    expect(within(etfCard).getByText(/Stale price · Change vs previous close · Quote as of/)).toBeInTheDocument()
 
     const indexCard = screen.getByText('S&P 500').closest('article')!
     expect(within(indexCard).queryByText(/%/)).not.toBeInTheDocument()

@@ -74,6 +74,29 @@ def test_realtime_rejection_falls_back_to_daily_close_and_uses_observed_movement
     assert "/eod/BMW.XETRA" in seen[1][0]
 
 
+def test_weekend_initial_refresh_uses_latest_available_daily_quote_with_bounded_window(monkeypatch):
+    class Sunday(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 10, 25)
+
+    monkeypatch.setattr("app.provider_adapters.eodhd.date", Sunday)
+    seen = []
+    rows = [
+        {"date": "2026-10-22", "close": "100.00"},
+        {"date": "2026-10-23", "close": "105.50"},
+    ]
+    gateway = EodhdMarketGateway("secret", opener=fake_opener([{"error": "market closed"}, rows], seen))
+
+    quote = gateway.fetch_market_data(["BMW"], None).quotes[0]
+
+    assert quote.price == Decimal("105.50")
+    assert quote.as_of == datetime(2026, 10, 23, tzinfo=UTC)
+    assert quote.change_percent == Decimal("5.500")
+    assert seen[1][1]["from"] == ["2026-10-11"]
+    assert seen[1][1]["to"] == ["2026-10-25"]
+
+
 def test_historical_exact_date_path_does_not_use_latest_row():
     seen = []
     gateway = EodhdMarketGateway("secret", opener=fake_opener([[
