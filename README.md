@@ -212,6 +212,37 @@ Redacted local run evidence (same fingerprint for firing and recovery; repeated 
 2026-10-25T19:35:45Z alert_delivery {"fingerprint":"0850647b23910719","labels":{"alert_id":"dashboard-availability","alertname":"Dashboard unavailable","http_request_method":"GET","http_response_status_class":"5xx","http_route":"/api/dashboard","journey":"dashboard","journey_outcome":"failure","severity":"critical"},"startsAt":"2026-10-25T19:34:40Z","status":"resolved"}
 ```
 
+### Local on-call recovery demo (issue #40)
+
+This reuses only the optional `marketlens-observability` Compose stack. Keep the host agent running before fault injection so it detects the real Grafana event automatically. The receiver feed is published on loopback only (`127.0.0.1:8081`); it exposes sanitized alert events, never a command endpoint.
+
+In terminal 1, start the isolated stack as above and run the host agent from the repository root:
+
+```powershell
+uv run python -m app.oncall_agent
+```
+
+Wait for `oncall status=ready`. In terminal 2, create the approved isolated fault and inspect the dashboard:
+
+```powershell
+docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml stop db
+curl.exe -i http://127.0.0.1:8001/api/dashboard
+```
+
+Grafana's real dashboard availability notification reaches the receiver; the agent reads the sanitized event feed, verifies the fixed project/service labels and stopped state, then runs only `docker compose ... start db`. It checks the DB health and polls `/api/dashboard` for HTTP 200 before logging `oncall status=recovered`. Grafana later sends `resolved`; the agent rechecks the dashboard before logging `resolved_verified`. Keep the agent process running through recovery and resolution. The agent performs at most one action for each alert fingerprint/start time; unknown alerts, a healthy DB, duplicate events, or failed verification produce an escalation with no retry. It does not connect to Render or providers, accept shell input, or access any other Compose project. Audit output contains only allowlisted status/action values and no request or database payloads.
+
+The receiver's GET `/agent/events?after=N` endpoint is read-only and returns only its redacted delivery registry. Tests cover fixed-target start/restart, unexpected labels, already-healthy state, duplicates, and failed health/dashboard verification. The real end-to-end chain requires Docker and the optional local observability stack; verify the firing and resolved `oncall` records in the terminal and the alert state under Grafana **Alerting → Alert rules**. Never stop a database outside this isolated project.
+
+Redacted automatic recovery evidence (2026-10-25 UTC; one allowed `start db`, no duplicate action):
+
+```text
+19:53:00Z  dashboard fault injected only by stopping marketlens-observability/db; /api/dashboard returned HTTP 500
+19:53:14Z  alert_delivery status=firing fingerprint=0850647b23910719
+19:53:24Z  oncall status=recovered action=start dashboard=healthy; marketlens-observability/db healthy; /api/dashboard returned HTTP 200
+19:54:14Z  alert_delivery status=resolved fingerprint=0850647b23910719
+19:54:14Z  oncall status=resolved_verified
+```
+
 ### Render deployment
 
 The live application is [https://marketlens-dtc.onrender.com/](https://marketlens-dtc.onrender.com/). Its repository settings are:

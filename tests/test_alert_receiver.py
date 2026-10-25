@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+from http.server import ThreadingHTTPServer
+from urllib.request import urlopen
 
-from app.alert_receiver import DeliveryRegistry
+from app import alert_receiver
+from app.alert_receiver import AlertHandler, DeliveryRegistry
 
 
 def notification(status: str) -> dict:
@@ -63,3 +67,24 @@ def test_receiver_ignores_unapproved_alerts_and_malformed_correlation() -> None:
     malformed_trace["alerts"][0]["labels"]["trace_id"] = "not-a-trace-id"
     assert registry.accept(malformed_trace) == (1, 1)
     assert "trace_id" not in registry.events()[0]["labels"]
+
+
+def test_read_only_agent_feed_returns_only_sanitized_events(monkeypatch) -> None:
+    registry = DeliveryRegistry()
+    registry.accept(notification("firing"))
+    monkeypatch.setattr(alert_receiver, "registry", registry)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), AlertHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with urlopen(f"http://127.0.0.1:{server.server_port}/agent/events?after=0") as response:
+            result = json.loads(response.read())
+        assert result["cursor"] == 1
+        assert result["events"][0]["status"] == "firing"
+        assert "authorization" not in json.dumps(result)
+        with urlopen(f"http://127.0.0.1:{server.server_port}/agent/events?after=1") as response:
+            assert json.loads(response.read()) == {"events": [], "cursor": 1}
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

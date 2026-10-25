@@ -8,6 +8,7 @@ import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 logger = logging.getLogger("marketlens.alert_receiver")
 SAFE_LABEL_VALUES = {
@@ -80,12 +81,42 @@ class DeliveryRegistry:
         with self._lock:
             return list(self._events)
 
+    def events_after(self, cursor: int) -> tuple[list[dict[str, Any]], int]:
+        with self._lock:
+            next_cursor = len(self._events)
+            if cursor > next_cursor:
+                cursor = next_cursor
+            return list(self._events[cursor:]), next_cursor
+
 
 registry = DeliveryRegistry()
 
 
 class AlertHandler(BaseHTTPRequestHandler):
     server_version = "MarketLensAlertReceiver/1"
+
+    def do_GET(self) -> None:
+        parsed = urlsplit(self.path)
+        if parsed.path != "/agent/events":
+            self.send_error(404)
+            return
+        try:
+            query = parse_qs(parsed.query, strict_parsing=True)
+            if set(query) - {"after"} or len(query.get("after", ["0"])) != 1:
+                raise ValueError
+            cursor = int(query.get("after", ["0"])[0])
+            if cursor < 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            self.send_error(400)
+            return
+        events, next_cursor = registry.events_after(cursor)
+        body = json.dumps({"events": events, "cursor": next_cursor}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_POST(self) -> None:
         if self.path != "/webhook":
