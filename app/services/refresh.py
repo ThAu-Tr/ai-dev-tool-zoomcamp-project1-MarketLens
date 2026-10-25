@@ -68,10 +68,16 @@ class RefreshService:
                 self.repository.mark_unavailable(user.id, missing)
                 self.repository.session.commit()
                 raise ProviderUnavailableError("Market data is unavailable for one or more tracked symbols.")
-        # A provider may omit a symbol when no newer quote exists. Existing values
-        # remain untouched; only normalized, newer quotes are applied.
-        newer = [quote for quote in quotes if since is None or _as_utc(quote.as_of) > _as_utc(since)]
-        if not newer:
+        # The account watermark controls provider queries, but a first quote for
+        # an asset can legitimately predate it (for example, Friday's close on
+        # the first refresh after a weekend). Compare against each asset instead.
+        assets_by_ticker = {asset.ticker.upper(): asset for asset in assets}
+        applicable = [
+            quote for quote in quotes
+            if (asset := assets_by_ticker.get(quote.ticker.upper())) is not None
+            and (asset.price is None or asset.as_of is None or _as_utc(quote.as_of) > _as_utc(asset.as_of))
+        ]
+        if not applicable:
             if since is None:
                 raise ProviderUnavailableError("No newer market data is available.")
             state = self.repository.session.get(RefreshState, user.id)
@@ -80,8 +86,11 @@ class RefreshService:
                 self.repository.session.commit()
             refreshed_at = _as_utc(since)
         else:
-            refreshed_at = max(_as_utc(quote.as_of) for quote in newer)
-            self.repository.apply_quotes(user.id, newer, refreshed_at)
+            latest_quote_at = max(_as_utc(quote.as_of) for quote in applicable)
+            # A late first observation must not move the account query watermark
+            # backwards from a newer successful refresh.
+            refreshed_at = max(_as_utc(since), latest_quote_at) if since is not None else latest_quote_at
+            self.repository.apply_quotes(user.id, applicable, refreshed_at)
             self.repository.session.commit()
 
         # News availability is intentionally independent of price availability:

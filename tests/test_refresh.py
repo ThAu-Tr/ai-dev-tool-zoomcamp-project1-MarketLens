@@ -98,6 +98,26 @@ def test_weekend_first_refresh_persists_last_available_quote_as_of_observation(s
     assert asset["priceStatus"] == "current"
 
 
+def test_weekend_first_quote_applies_even_when_older_than_account_watermark(session_factory):
+    with session_factory.begin() as session:
+        session.add(DemoUser(id=1, identifier="demo-user"))
+        session.add(Asset(id="aapl", user_id=1, name="Apple", ticker="AAPL", exchange="NASDAQ", asset_type="Stock", status="Interested", price=None, currency=None, change_percent=None, as_of=None, industries=[]))
+        session.add(RefreshState(user_id=1, last_refreshed_at=datetime(2026, 10, 23, 20, 29, tzinfo=UTC)))
+    friday_quote = MarketQuote("AAPL", Decimal("225.50"), "USD", Decimal("1.25"), datetime(2026, 10, 23, tzinfo=UTC))
+    provider = FakeMarketProvider([friday_quote])
+
+    response = build_client(session_factory, provider).post("/api/refresh")
+
+    assert response.status_code == 200
+    asset = build_client(session_factory, provider).get("/api/dashboard").json()["assets"][0]
+    assert asset["price"] == 225.5
+    assert asset["asOf"] == "2026-10-23T00:00:00Z"
+    assert asset["changePercent"] == 1.25
+    assert asset["priceStatus"] == "current"
+    with session_factory() as session:
+        assert session.get(RefreshState, 1).last_refreshed_at == datetime(2026, 10, 23, 20, 29)
+
+
 def test_incomplete_provider_result_is_unavailable_and_does_not_write(session_factory):
     seed_asset(session_factory)
     provider = FakeMarketProvider()
