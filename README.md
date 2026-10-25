@@ -2,37 +2,27 @@
 
 MarketLens is a lightweight investment-monitoring application for everyday investors who want to follow stocks, ETFs, and major indices in one place. It combines price movement with relevant news and carefully qualified AI context so users can understand possible market context without receiving investment advice.
 
-> **Project status:** Phase 2 is in progress. The stored dashboard, supported-asset search, and adding a selected asset to the watchlist are implemented and tested. The remaining MVP features are tracked as GitHub issues.
+> **Project status:** M4 local MVP accepted ([human acceptance #22](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/22)); milestone documentation is tracked in [#23](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/23). M5 (containerization, CI/CD, deployment) comes next.
 
 ## The problem
 
 Everyday investors often need to piece together price movements, company news, industry developments, and wider events from separate sources. That makes it difficult to understand what may be relevant today or to revisit the context around a past market day.
 
-MarketLens brings those inputs into a combined dashboard and, later in the MVP, a persistent historical timeline. It is a monitoring and context tool—not a trading system, portfolio optimiser, or source of investment recommendations.
+MarketLens brings those inputs into a combined dashboard and a persistent historical price timeline. It is a monitoring and context tool—not a trading system, portfolio optimiser, or source of investment recommendations.
 
 ## What exists today
 
-The following vertical slices are complete:
+The locally accepted MVP includes a persisted dashboard; a bounded, curated stock/ETF/index catalogue; Owned and Interested watchlists with purchase lots; followed industries; manual refresh of prices through EODHD and categorized news through Marketaux; qualified, source-linked AI context; and a historical price timeline.
 
-- A persisted, read-only dashboard through `GET /api/dashboard`, including empty, error, and uncertainty-aware AI-context states.
-- A deterministic catalogue search for supported Stocks, ETFs, and Indices through `GET /api/assets/search`.
-
-The picker uses a deliberately bounded, local catalogue of commonly traded US and European stocks, broad-market and thematic ETFs, and selected indices. It is a curated MVP list, not a complete securities master or live discovery service. Maintainers should verify new EODHD symbols against EODHD's supported-tickers list before adding them; picker searches never call a provider, and an entry does not promise data coverage for every account or date. Unmapped symbols are reported as unavailable by the market-data adapter rather than receiving a fabricated quote. Industry suggestions come from explicit catalogue metadata and are never automatically followed.
-- Catalogue-validated creation of an Owned or Interested watchlist asset through `POST /api/assets`.
-- PostgreSQL-oriented persistence with Alembic migrations and a seeded demo-user model.
-- Backend tests, React component/API tests, and a production frontend build check.
-
-See the completed work in [issue #1](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/1), [issue #2](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/2), and [issue #3](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/3).
+The asset picker searches a local catalogue rather than the provider's entire supported universe. Provider-wide discovery is deferred to [#32](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/32). News per followed industry and automatic redisplay of stored news after refollowing are deferred to [#30](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/30) and [#31](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/31). Human acceptance and the history of corrected defects are recorded in [#22](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/22).
 
 ## Demo
 
 There is no deployed demo, video, or screenshot yet.
 
-// TODO: Add a short demo recording or screenshots once the main MVP flow is complete and runnable end to end.
-
 ## MVP scope
 
-The planned MVP lets a single demo user:
+The locally implemented MVP lets a single demo user:
 
 1. Follow Stocks, ETFs, and major Indices as Owned or Interested.
 2. Record active purchase lots for Owned Stocks and ETFs.
@@ -42,7 +32,7 @@ The planned MVP lets a single demo user:
 6. Load historical price movements for individual days within the initial 30-day request window and reuse stored results.
 
 The product deliberately excludes trading, broker integrations, authentication, real-time alerts, full portfolio accounting, crypto, and investment recommendations. Read the complete [product specification](_docs/plan.md).
-Historical news, AI-generated historical context, and the complete archived-day experience are planned as post-MVP extensions (#15 and #16).
+Historical news, AI-generated historical context, and the complete archived-day experience are post-MVP extensions (#15 and #16). Additional post-MVP requests are tracked in #30–#32.
 
 ## Architecture
 
@@ -125,9 +115,15 @@ To manually smoke-check Marketaux after provider composition is enabled, configu
 
 After migrations, start the backend with `EODHD_API_KEY` set and request `POST /api/refresh` once. Confirm the response succeeds and `GET /api/dashboard` shows an `asOf` timestamp and currency supplied by the provider. Then request `GET /api/timeline?date=YYYY-MM-DD` for one eligible date with known EODHD coverage and confirm its `source` is `newly-loaded`; request the same date again and confirm `source` is `archive`. The second request should not call EODHD. Each refresh may try the intraday endpoint and then fall back to daily closes; use one tracked asset and avoid repeated retries to stay within the free account's daily request limit. Adapter tests mock HTTP and never consume API calls.
 
-The frontend uses `VITE_API_BASE_URL` when it needs a non-default API origin. Provider credentials are not used by the currently completed features and must never be exposed to the browser.
+The frontend uses `VITE_API_BASE_URL` to select the backend URL. To run the React development server in a separate PowerShell terminal, use:
 
-// TODO: Add a verified, reproducible full-stack local-development guide, including PostgreSQL provisioning, the FastAPI start command, frontend API-origin configuration, and CORS setup.
+```powershell
+npm --prefix frontend install
+$env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
+npm --prefix frontend run dev
+```
+
+The FastAPI backend permits configured frontend origins through `CORS_ALLOWED_ORIGINS` (default `http://localhost:5173`; see `.env.example`). If using another frontend origin, explicitly configure it. Keep EODHD, Marketaux, and OpenAI keys on the backend only. Apply `uv run alembic upgrade head` after updating the application code and before starting the backend.
 
 ## Testing and quality
 
@@ -143,15 +139,13 @@ The project adds tests with each completed vertical feature. Tests use determini
 
 ## Limitations and future work
 
-The current implementation is intentionally incomplete: it has no live market or news provider integration, refresh workflow, industry management, purchase-lot editor, history UI, authentication, deployment, CI, or operational monitoring.
+The MVP supports one demo user, a bounded local instrument catalogue and provider-dependent market/news/AI coverage. An article or AI summary is not guaranteed for every tracked asset or industry; AI context depends on eligible recent evidence and provider availability. Historical news/AI and a complete archived-day experience remain post-MVP (#15/#16). Further enhancements are tracked in [#30](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/30) (per-industry news status), [#31](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/31) (automatic redisplay after refollow), and [#32](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/32) (provider-wide asset discovery).
 
-// TODO: Replace this section with deployed-system limitations and prioritized post-MVP work once the MVP feature backlog is complete.
+M4 evidence: [#20](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/20) records the initial automated-suite verification (119 backend tests and 45 frontend tests, plus frontend build; original Windows rerun was blocked by an environment-level Python issue). [#21](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/21) records the separately runnable integration suite (4 passed), a subsequent backend suite (123 passed), and frontend/build checks. Later targeted QA for [#29](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/29) passed the weekend-quote fix; that issue also records a date-dependent full-suite AI-context test failure, so these are historical test snapshots, **not a claim that the latest full suite was rerun for #23**. The human accepted the local MVP in [#22](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/22).
 
 ## Deployment and CI/CD
 
-No public deployment or continuous-integration workflow exists yet.
-
-// TODO: Document containerization, hosted services, required deployment secrets, CI checks, and the public demo URL after the productionization phase.
+Public deployment and continuous integration are planned for M5; they are not part of the completed local M4 milestone.
 
 
 ### AI context (issue #13)
