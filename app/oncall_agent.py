@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import subprocess
 import time
@@ -19,6 +20,8 @@ ALERT_ID = "dashboard-availability"
 PROJECT = "marketlens-observability"
 SERVICE = "db"
 FINGERPRINT_RE = re.compile(r"^[a-f0-9]{8,64}$")
+STARTS_AT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
+STATE_VALUES = {"attempted", "recovered", "resolved"}
 
 
 @dataclass(frozen=True)
@@ -43,7 +46,7 @@ def _event_key(event: dict[str, Any]) -> tuple[str, str] | None:
     labels = event.get("labels")
     if not isinstance(fingerprint, str) or not FINGERPRINT_RE.fullmatch(fingerprint):
         return None
-    if not isinstance(starts_at, str) or len(starts_at) < 20:
+    if not isinstance(starts_at, str) or not STARTS_AT_RE.fullmatch(starts_at):
         return None
     if not isinstance(labels, dict) or any(labels.get(key) != value for key, value in {
         "alert_id": ALERT_ID, "journey": "dashboard", "http_route": "/api/dashboard",
@@ -55,14 +58,75 @@ def _event_key(event: dict[str, Any]) -> tuple[str, str] | None:
 
 
 class OnCallAgent:
-    """Handle only allowlisted alert events and at most one action per alert key."""
+    """Handle allowlisted alerts with durable one-action state per alert key."""
 
-    def __init__(self, recovery: RecoveryAdapter, audit=logger.info) -> None:
+    def __init__(
+        self,
+        recovery: RecoveryAdapter,
+        audit=logger.info,
+        state_path: Path | None = None,
+    ) -> None:
         self.recovery = recovery
         self.audit = audit
-        self._attempted: set[tuple[str, str]] = set()
-        self._recovered: set[tuple[str, str]] = set()
-        self._resolved: set[tuple[str, str]] = set()
+        self.state_path = state_path or Path(__file__).resolve().parents[1] / ".oncall-agent-state.json"
+        self._alert_states: dict[tuple[str, str], str] = {}
+        self._state_failed = False
+        self._load_state()
+
+    def _load_state(self) -> None:
+        try:
+            if not self.state_path.exists():
+                return
+            if self.state_path.stat().st_size > 1_048_576:
+                raise ValueError("state_file_too_large")
+            payload = json.loads(self.state_path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict) or payload.get("version") != 1 or not isinstance(payload.get("alerts"), list):
+                raise ValueError("invalid_state_file")
+            for record in payload["alerts"]:
+                if not isinstance(record, dict) or set(record) != {"fingerprint", "startsAt", "state"}:
+                    raise ValueError("invalid_state_record")
+                key = (record["fingerprint"], record["startsAt"])
+                if (
+                    not isinstance(key[0], str) or not FINGERPRINT_RE.fullmatch(key[0])
+                    or not isinstance(key[1], str) or not STARTS_AT_RE.fullmatch(key[1])
+                    or record["state"] not in STATE_VALUES
+                    or key in self._alert_states
+                ):
+                    raise ValueError("invalid_state_record")
+                self._alert_states[key] = record["state"]
+        except (OSError, UnicodeError, ValueError, TypeError):
+            self._alert_states.clear()
+            self._state_failed = True
+
+    def _persist_state(self, key: tuple[str, str], state: str) -> bool:
+        if self._state_failed or state not in STATE_VALUES:
+            return False
+        updated = dict(self._alert_states)
+        updated[key] = state
+        payload = {
+            "version": 1,
+            "alerts": [
+                {"fingerprint": fingerprint, "startsAt": starts_at, "state": value}
+                for (fingerprint, starts_at), value in sorted(updated.items())
+            ],
+        }
+        temporary = self.state_path.with_name(self.state_path.name + ".tmp")
+        try:
+            self.state_path.parent.mkdir(parents=True, exist_ok=True)
+            with temporary.open("w", encoding="utf-8", newline="\n") as state_file:
+                state_file.write(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+                state_file.flush()
+                os.fsync(state_file.fileno())
+            os.replace(temporary, self.state_path)
+        except OSError:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+            self._state_failed = True
+            return False
+        self._alert_states = updated
+        return True
 
     def handle(self, event: dict[str, Any]) -> None:
         key = _event_key(event)
@@ -70,24 +134,32 @@ class OnCallAgent:
             self.audit("oncall status=escalated reason=unapproved_alert")
             return
         status = event["status"]
+        if self._state_failed:
+            self.audit("oncall status=escalated reason=state_unavailable")
+            return
         if status == "repeated":
             self.audit("oncall status=escalated reason=repeated_alert")
             return
         if status == "resolved":
-            if key in self._resolved:
+            prior_state = self._alert_states.get(key)
+            if prior_state == "resolved":
                 self.audit("oncall status=duplicate_ignored")
-            elif key not in self._recovered:
+            elif prior_state != "recovered":
                 self.audit("oncall status=escalated reason=unverified_recovery")
             elif self.recovery.dashboard_healthy():
-                self._resolved.add(key)
-                self.audit("oncall status=resolved_verified")
+                if self._persist_state(key, "resolved"):
+                    self.audit("oncall status=resolved_verified")
+                else:
+                    self.audit("oncall status=escalated reason=state_unavailable")
             else:
                 self.audit("oncall status=escalated reason=dashboard_unhealthy")
             return
-        if key in self._attempted:
+        if key in self._alert_states:
             self.audit("oncall status=escalated reason=repeated_alert")
             return
-        self._attempted.add(key)
+        if not self._persist_state(key, "attempted"):
+            self.audit("oncall status=escalated reason=state_unavailable")
+            return
         try:
             state = self.recovery.inspect_database()
         except Exception:
@@ -109,8 +181,10 @@ class OnCallAgent:
         except Exception:
             dashboard = False
         if dashboard:
-            self._recovered.add(key)
-            self.audit(f"oncall status=recovered action={action} dashboard=healthy")
+            if self._persist_state(key, "recovered"):
+                self.audit(f"oncall status=recovered action={action} dashboard=healthy")
+            else:
+                self.audit("oncall status=escalated reason=state_unavailable")
         else:
             self.audit(f"oncall status=escalated reason=recovery_unverified action={action}")
 

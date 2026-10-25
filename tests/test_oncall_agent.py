@@ -42,9 +42,9 @@ def event(status="firing", *, fingerprint="a1b2c3d4", starts_at="2026-10-25T19:0
     return {"status": status, "fingerprint": fingerprint, "startsAt": starts_at, "labels": labels}
 
 
-def test_stopped_database_uses_the_single_restart_action_and_resolution_rechecks_dashboard():
+def test_stopped_database_uses_the_single_restart_action_and_resolution_rechecks_dashboard(tmp_path):
     recovery, records = FakeRecovery(), []
-    agent = OnCallAgent(recovery, records.append)
+    agent = OnCallAgent(recovery, records.append, tmp_path / "agent-state.json")
     agent.handle(event())
     agent.handle(event())
     agent.handle(event("resolved"))
@@ -55,19 +55,19 @@ def test_stopped_database_uses_the_single_restart_action_and_resolution_rechecks
                        "oncall status=duplicate_ignored"]
 
 
-def test_unhealthy_database_restarts_only_the_fixed_db():
+def test_unhealthy_database_restarts_only_the_fixed_db(tmp_path):
     recovery = FakeRecovery(DatabaseState("marketlens-observability", "db", "running", "unhealthy"))
-    OnCallAgent(recovery, lambda _: None).handle(event())
+    OnCallAgent(recovery, lambda _: None, tmp_path / "agent-state.json").handle(event())
     assert recovery.actions == ["restart"]
 
 
-def test_unapproved_or_mismatched_target_escalates_without_action():
+def test_unapproved_or_mismatched_target_escalates_without_action(tmp_path):
     recovery, records = FakeRecovery(), []
-    agent = OnCallAgent(recovery, records.append)
+    agent = OnCallAgent(recovery, records.append, tmp_path / "agent-state.json")
     agent.handle(event(alert_id="other"))
     agent.handle(event(fingerprint="bad!"))
     mismatch = FakeRecovery(DatabaseState("other-project", "db", "exited", "none"))
-    OnCallAgent(mismatch, records.append).handle(event())
+    OnCallAgent(mismatch, records.append, tmp_path / "mismatch-state.json").handle(event())
     assert recovery.actions == []
     assert mismatch.actions == []
     assert records == ["oncall status=escalated reason=unapproved_alert",
@@ -75,33 +75,77 @@ def test_unapproved_or_mismatched_target_escalates_without_action():
                        "oncall status=escalated reason=target_mismatch"]
 
 
-def test_healthy_database_and_failed_verification_escalate_without_retries():
+def test_healthy_database_and_failed_verification_escalate_without_retries(tmp_path):
     healthy = FakeRecovery(DatabaseState("marketlens-observability", "db", "running", "healthy"))
-    OnCallAgent(healthy, lambda _: None).handle(event())
+    OnCallAgent(healthy, lambda _: None, tmp_path / "healthy-state.json").handle(event())
     assert healthy.actions == []
 
     unknown = FakeRecovery(DatabaseState("marketlens-observability", "db", "paused", "none"))
-    OnCallAgent(unknown, lambda _: None).handle(event())
+    OnCallAgent(unknown, lambda _: None, tmp_path / "unknown-state.json").handle(event())
     assert unknown.actions == []
 
     failed = FakeRecovery(healthy=False)
-    agent = OnCallAgent(failed, lambda _: None)
+    agent = OnCallAgent(failed, lambda _: None, tmp_path / "failed-state.json")
     agent.handle(event())
     agent.handle(event("resolved"))
     assert failed.actions == ["restart"]
     assert failed.inspections == 1
 
     api_failed = FakeRecovery(dashboard=False)
-    OnCallAgent(api_failed, lambda _: None).handle(event())
+    OnCallAgent(api_failed, lambda _: None, tmp_path / "api-failed-state.json").handle(event())
     assert api_failed.actions == ["restart"]
 
 
-def test_unhealthy_action_failure_is_not_retried_for_same_alert_key():
+def test_unhealthy_action_failure_is_not_retried_for_same_alert_key(tmp_path):
     recovery = FakeRecovery(DatabaseState("marketlens-observability", "db", "running", "unhealthy"), acted=False)
-    agent = OnCallAgent(recovery, lambda _: None)
+    agent = OnCallAgent(recovery, lambda _: None, tmp_path / "agent-state.json")
     agent.handle(event())
     agent.handle(event())
     assert recovery.actions == ["restart"]
+
+
+def test_restart_replay_escalates_without_action_and_resolved_rechecks_api(tmp_path):
+    state_path = tmp_path / "agent-state.json"
+    first_recovery, first_records = FakeRecovery(), []
+    OnCallAgent(first_recovery, first_records.append, state_path).handle(event())
+    assert first_recovery.actions == ["restart"]
+    saved_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert saved_state == {
+        "version": 1,
+        "alerts": [{"fingerprint": "a1b2c3d4", "startsAt": "2026-10-25T19:00:00Z", "state": "recovered"}],
+    }
+
+    replay_recovery, replay_records = FakeRecovery(), []
+    restarted_agent = OnCallAgent(replay_recovery, replay_records.append, state_path)
+    restarted_agent.handle(event())
+    restarted_agent.handle(event("resolved"))
+    assert replay_recovery.actions == []
+    assert replay_records == ["oncall status=escalated reason=repeated_alert",
+                              "oncall status=resolved_verified"]
+
+
+def test_restart_replay_of_unverified_attempt_escalates_without_second_action(tmp_path):
+    state_path = tmp_path / "agent-state.json"
+    first_recovery = FakeRecovery(healthy=False)
+    OnCallAgent(first_recovery, lambda _: None, state_path).handle(event())
+    assert first_recovery.actions == ["restart"]
+
+    replay_recovery, records = FakeRecovery(), []
+    restarted_agent = OnCallAgent(replay_recovery, records.append, state_path)
+    restarted_agent.handle(event())
+    restarted_agent.handle(event("resolved"))
+    assert replay_recovery.actions == []
+    assert records == ["oncall status=escalated reason=repeated_alert",
+                       "oncall status=escalated reason=unverified_recovery"]
+
+
+def test_corrupt_durable_state_fails_closed(tmp_path):
+    state_path = tmp_path / "agent-state.json"
+    state_path.write_text("not-json", encoding="utf-8")
+    recovery, records = FakeRecovery(), []
+    OnCallAgent(recovery, records.append, state_path).handle(event())
+    assert recovery.actions == []
+    assert records == ["oncall status=escalated reason=state_unavailable"]
 
 
 def test_docker_adapter_uses_fixed_argv_without_shell(monkeypatch, tmp_path):
@@ -130,7 +174,7 @@ def test_docker_adapter_uses_fixed_argv_without_shell(monkeypatch, tmp_path):
     assert all("marketlens-observability" in call[0] or call[0][1] == "inspect" for call in calls)
 
 
-def test_receiver_feed_poll_wakes_agent_and_escalates_repeated_delivery(monkeypatch):
+def test_receiver_feed_poll_wakes_agent_and_escalates_repeated_delivery(monkeypatch, tmp_path):
     registry = DeliveryRegistry()
     monkeypatch.setattr(alert_receiver, "registry", registry)
     server = ThreadingHTTPServer(("127.0.0.1", 0), AlertHandler)
@@ -147,7 +191,7 @@ def test_receiver_feed_poll_wakes_agent_and_escalates_repeated_delivery(monkeypa
                 assert response.status == 202
 
         recovery, records = FakeRecovery(), []
-        agent = OnCallAgent(recovery, records.append)
+        agent = OnCallAgent(recovery, records.append, tmp_path / "agent-state.json")
         cursor = poll_once(0, agent, f"http://127.0.0.1:{server.server_port}/agent/events")
         assert cursor == 2
         assert recovery.actions == ["restart"]

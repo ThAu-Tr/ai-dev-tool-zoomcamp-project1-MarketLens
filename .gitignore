@@ -20,6 +20,7 @@ vite.config.d.ts
 !.env.example
 !.env.compose.example
 !.env.observability.example
+.oncall-agent-state.json*
 .DS_Store
 .idea/
 .vscode/
