@@ -537,11 +537,11 @@ Good moments to capture:
 
 ### After Phase 2
 
-- [ ] Update implemented-feature overview.
-- [ ] Add local run instructions.
-- [ ] Add test instructions.
-- [ ] Add database/environment notes.
-- [ ] Add representative AI implementation examples.
+- [X] Update implemented-feature overview.
+- [X] Add local run instructions.
+- [X] Add test instructions.
+- [X] Add database/environment notes.
+- [X] Add representative AI implementation examples.
 
 ### After Phase 3
 
