@@ -217,17 +217,17 @@ Work through the backlog issue by issue.
 
 For each important feature:
 
-- [ ] PM grooms the issue.
-- [ ] PM defines the goal.
-- [ ] PM defines acceptance criteria.
-- [ ] PM defines out-of-scope behavior where necessary.
-- [ ] SWE implements the feature.
-- [ ] SWE adds appropriate tests.
-- [ ] QA checks the acceptance criteria.
-- [ ] QA returns PASS or FAIL.
-- [ ] If FAIL, return the issue to SWE.
-- [ ] Human-review the important changes.
-- [ ] Merge/close the issue when accepted.
+- [X] PM grooms the issue.
+- [X] PM defines the goal.
+- [X] PM defines acceptance criteria.
+- [X] PM defines out-of-scope behavior where necessary.
+- [X] SWE implements the feature.
+- [X] SWE adds appropriate tests.
+- [X] QA checks the acceptance criteria.
+- [X] QA returns PASS or FAIL.
+- [X] If FAIL, return the issue to SWE.
+- [X] Human-review the important changes.
+- [X] Merge/close the issue when accepted.
 
 Each feature should ideally cover all necessary layers:
 
@@ -276,7 +276,7 @@ For relevant features:
 - [X] Add frontend/component tests where useful.
 - [X] Test validation and failure cases.
 - [X] Keep tests runnable locally.
-- [ ] Maintain a passing test suite.
+- [ ] Maintain a passing test suite. (Historical passing suites are recorded in #20/#21; latest full backend run for #29 reported a date-dependent AI-context failure, so no current all-green claim.)
 
 Focus effort on important behavior rather than maximizing test count.
 
@@ -286,11 +286,11 @@ Focus effort on important behavior rather than maximizing test count.
 
 Once the main system works end-to-end:
 
-- [ ] Identify the 1–3 most important user workflows.
-- [ ] Create integration tests for those workflows.
-- [ ] Clearly separate integration tests from unit/component tests.
-- [ ] Ensure tests exercise multiple system components.
-- [ ] Document how integration tests are run.
+- [X] Identify the 1–3 most important user workflows.
+- [X] Create integration tests for those workflows.
+- [X] Clearly separate integration tests from unit/component tests.
+- [X] Ensure tests exercise multiple system components.
+- [X] Document how integration tests are run.
 
 Example:
 
@@ -617,7 +617,7 @@ Final checklist:
 - [ ] **M1 — MVP Defined:** Product scope and non-goals are clear.
 - [ ] **M2 — Prototype Validated:** Core MVP works with a mock frontend.
 - [ ] **M3 — Backlog Ready:** Validated MVP translated into executable GitHub Issues.
-- [ ] **M4 — Local MVP Complete:** Full-stack MVP works locally with persistence and tests.
+- [X] **M4 — Local MVP Complete:** Full-stack MVP locally accepted in #22 with persistence and documented test evidence in #20/#21/#23 (see noted test limitation).
 - [ ] **M5 — Public MVP Complete:** Application is containerized, tested and deployed.
 - [ ] **M6 — Production Evidence Complete:** Operations, security and audit requirements are covered.
 - [ ] **M7 — Optional Extensions Complete:** Week 5 / criterion 12 added if worthwhile.
