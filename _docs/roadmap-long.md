@@ -326,7 +326,7 @@ Response
 - [X] Make sure the application runs in containers.
 - [X] Add Docker Compose only if useful.
 - [X] Move configuration into environment variables.
-- [ ] Verify the complete app starts from a clean environment.
+- [X] Verify the complete app starts from a clean environment.
 - [X] Document container startup.
 
 ### Output
@@ -390,88 +390,86 @@ Response
 
 ---
 
-# Phase 4 — Operations & Hardening
+# Phase 4 — Observability & User-Impact Alerting
 
-## 15. Add basic observability
+## Current rubric and scope
 
-Do the smallest amount necessary to meaningfully operate and diagnose the application.
+This future work targets the [final-project rubric](https://raw.githubusercontent.com/DataTalksClub/ai-dev-tools-zoomcamp/main/project/README.md) checked on **2026-10-25**: 12 criteria, 24 available points, and a passing submission requires **at least 10 points plus three completed peer reviews**. Recheck the current rubric before submission.
 
-- [ ] Add useful application logging.
-- [ ] Log errors.
-- [ ] Add health/status information if useful.
-- [ ] Add metrics only where they provide rubric value.
-- [ ] Verify that a production problem could be diagnosed from available information.
+M6–M8 below are roadmap targets, not claims of delivered evidence. Existing M1–M5 evidence is expected to exceed the passing score; confirm that assessment in M8 before spending effort on additional points. M6 targets criteria 10–11 (up to 3 points), and M7 targets criterion 12 (up to 2 points). Neither is a prerequisite for passing if the other evidenced criteria already reach 10 points. Security scans and generic agent extension packs are not separate criteria in this rubric.
 
-Do not build a large monitoring platform unless necessary.
+Keep all work within the existing MVP and React → FastAPI → PostgreSQL architecture. Prefer one existing dashboard journey and small operational changes. Choose tools during grooming; request approval before adding, removing or upgrading dependencies. This roadmap does not authorize production changes.
+
+## 15. Observe a key user journey
+
+Criterion 10 awards 1 point for logging and 2 points for key user journeys covered by metrics, traces and structured logs, with telemetry collected, stored and viewable in a UI.
+
+- [ ] Select and document one key journey, such as loading the stored watchlist/dashboard through the frontend, API and database.
+- [ ] Capture journey success/failure and latency metrics, traces, and structured logs correlated by a shared trace ID.
+- [ ] Collect and store the telemetry and demonstrate how to inspect it in a UI.
+- [ ] Exclude customer data and credentials from telemetry; do not record portfolio payloads, article contents, API keys or other secrets.
+- [ ] Demonstrate diagnosis of a controlled failure in an isolated dev/demo environment using the correlated telemetry.
+- [ ] Add deterministic tests for important instrumentation and redaction behavior, using fake external providers and no live market, news or AI calls.
 
 ### Output
-- Logging
-- Basic operational visibility
-- Operational diagnosis evidence
+- Documented journey and telemetry fields, retention/access settings and UI inspection instructions
+- Redacted evidence connecting metrics, traces and logs for one success and one controlled failure
+
+### Rubric coverage
+- Criterion 10 — Observability (target: 2/2)
 
 ---
 
-## 16. Add security and audit evidence
+## 16. Alert on user impact
 
-Cover the rubric without turning the project into a security project.
+Criterion 11 awards 1 point for at least one alert on user impact. These are operational alerts, not price notifications or investment recommendations.
 
-- [ ] Run a deterministic security/dependency scan.
-- [ ] Save or reference the findings.
-- [ ] Perform a PR/code audit.
-- [ ] Document relevant findings.
-- [ ] Document security considerations for agents/extensions.
-- [ ] Document how secrets are handled.
-- [ ] Document what information AI tools are allowed to access.
-- [ ] Create a short AI tool/data policy.
+- [ ] Define one actionable alert on the selected journey, with a documented failure/latency threshold, evaluation window and recovery condition.
+- [ ] Configure an actual alert delivery path and record enough redacted context to diagnose the affected journey.
+- [ ] Trigger the alert with a reproducible fault in an isolated dev/demo environment; do not interrupt the public application or consume live provider services.
+- [ ] Remove the fault and verify the user journey and alert return to a healthy state.
+- [ ] Test alert trigger, delivery, recovery and duplicate handling deterministically.
+- [ ] Record the alert rule, delivered alert and recovery evidence; obtain QA verification and human acceptance through the existing process.
 
 ### Output
-Possible artifacts:
-
-```text
-_docs/security.md
-_docs/ai-data-policy.md
-security scan output
-audit output
-```
+- One working user-impact alert and a safe trigger/recovery runbook
+- Redacted alert delivery and verified recovery evidence
 
 ### Rubric coverage
-- Security, audit and DevOps hardening
+- Criterion 11 — Alerting on User Impact (target: 1/1)
 
 ### Milestone
-**M6 — The deployed project has basic operational, audit and security evidence.**
+**M6 — One key MVP journey has inspectable, correlated telemetry and a demonstrated user-impact alert with verified recovery.**
 
 ---
 
-# Phase 5 — Optional Agent Extension
+# Phase 5 — Alert-Triggered On-Call Agent
 
-Do this only after the core project is complete and only if the additional rubric points justify the effort.
+## 17. Remediate one bounded operational failure
 
-Week 5 belongs here.
+Criterion 12 awards 2 points when an agent wakes on an alert and fixes the issue. Development-role documentation, a reusable skill, an MCP server or notification-only triage does not demonstrate this behavior.
 
-## 17. Evaluate criterion 12 effort
+Confirm evidence already meets the passing threshold before pursuing this additional score; finalize submission checks in M8. Reuse M6's alert and isolated dev/demo journey; do not add product features or a general-purpose autonomous operations platform.
 
-- [ ] Check the current rubric again before starting.
-- [ ] Determine what is already satisfied through Week 1 artifacts.
-- [ ] Calculate whether the additional point(s) justify the work.
-
-Possible extension components:
-
-- [ ] Reusable project workflow/skill
-- [ ] Specialized subagent
-- [ ] MCP tool/server
-- [ ] Hook or guardrail
-- [ ] Permission/security notes
-
-Do **not** create artificial reusable tooling before you have an actual workflow worth reusing.
+- [ ] Groom one recoverable operational failure and a specific remediation that restores the selected journey.
+- [ ] Connect the actual alert delivery to an agent wake-up, passing only redacted diagnostic context.
+- [ ] Define the agent's allowed actions, limited credentials, retry/time limits, duplicate handling, audit trail and escalation behavior.
+- [ ] Restrict autonomous remediation to the isolated dev/demo environment; exclude production access, destructive database actions, arbitrary shell execution and unrestricted provider calls.
+- [ ] Implement the bounded remediation and independently verify journey recovery; acknowledge success only after the health/journey check passes.
+- [ ] On unsupported failures, exhausted retries or failed verification, stop and escalate for human intervention.
+- [ ] Add deterministic tests for alert-triggered wake-up, successful remediation, failed recovery, duplicate alerts and permission boundaries, using fake external providers.
+- [ ] Demonstrate the complete chain: controlled fault → user-impact alert → agent wake-up → remediation → verified recovery.
+- [ ] Record redacted evidence and obtain QA verification and human acceptance through the existing process.
 
 ### Output
-- Agent extension pack only if worthwhile
+- Alert-triggered on-call agent with a documented, bounded remediation and permissions
+- Reproducible isolated fault/remediation runbook, deterministic test results and recovery evidence
 
 ### Rubric coverage
-- Agent Extension Pack
+- Criterion 12 — On-Call Agent (target: 2/2)
 
 ### Milestone
-**M7 — Optional additional rubric coverage completed.**
+**M7 — An actual alert wakes the on-call agent, which fixes one bounded operational issue and verifies recovery in an isolated environment.**
 
 ---
 
@@ -515,7 +513,7 @@ Good moments to capture:
 - one planning/prototyping example
 - two or three MVP implementation examples
 - one deployment/DevOps example
-- optionally one agent-extension example
+- optionally one alert-triggered on-call remediation example
 
 ### Output
 - `_docs/ai-usage-report.md`
@@ -553,15 +551,15 @@ Good moments to capture:
 
 ### After Phase 4
 
-- [ ] Add observability notes.
-- [ ] Add operational diagnosis evidence.
-- [ ] Add security/audit evidence.
-- [ ] Add AI tool/data policy.
+- [ ] Document the observed journey, telemetry UI, correlation and data redaction.
+- [ ] Link redacted success/failure diagnosis evidence.
+- [ ] Document the user-impact alert, isolated trigger and verified recovery evidence.
 
 ### After Phase 5
 
-- [ ] Document optional agent extensions if implemented.
-- [ ] Document permissions/security implications.
+- [ ] Document the on-call agent's alert trigger, allowed remediation and permission boundaries if implemented.
+- [ ] Link isolated end-to-end remediation evidence, deterministic test results and verified recovery.
+- [ ] Clearly mark any unimplemented rubric targets and retain QA/human acceptance records.
 
 ---
 
@@ -600,25 +598,29 @@ Final checklist:
 - [ ] OpenAPI documentation is accessible.
 - [ ] Architecture documentation is accessible.
 - [ ] AI usage report is accessible.
-- [ ] Security/audit evidence is accessible where required.
-- [ ] All commands have been tested from a clean setup where practical.
-- [ ] Remove outdated documentation.
-- [ ] Remove unused files/features.
-- [ ] Check the latest final-project rubric once more.
-- [ ] Map every rubric criterion to visible evidence in the repository.
+- [ ] M6/M7 telemetry, alert and on-call evidence is accessible if implemented; otherwise record the scoring gaps.
+- [ ] Verify documented setup, migrations and Docker Compose startup from a clean checkout; record the tested revision and prerequisites.
+- [ ] Correct stale documentation, including resolved test-failure warnings and obsolete security-audit/agent-extension rubric claims, while preserving historical milestone records.
+- [ ] Check that documentation describes the submitted MVP without adding unrelated cleanup or features.
+- [ ] Recheck the latest final-project rubric and record its date/version.
+- [ ] Map all 12 current criteria to direct evidence links, expected scores and remaining gaps: problem description; product specification; agent team specification; context management; application; testing; containerization; deployment; CI/CD; observability; alerting on user impact; on-call agent.
+- [ ] Confirm the submitted revision has passing CI and verify the public application and its main journey; link the CI run and deployment evidence.
+- [ ] Describe CI/CD accurately: tests plus current direct automatic Render deployment target 2/3; 3/3 requires automatic dev deployment followed by manual production deployment. A separate dev environment is an additional-score option, not required for passing.
+- [ ] Confirm at least 10/24 points from delivered evidence, without counting unimplemented M6/M7 targets.
+- [ ] Complete three peer reviews as required for a passing submission and record completion in the submission process.
 
 ### Final milestone
-**M8 — Another person can clone, understand, run, test and evaluate the complete project without additional explanation.**
+**M8 — The submitted revision is reproducible, its 12-criterion evidence map supports at least 10/24 points, and the three required peer reviews are complete.**
 
 ---
 
 # Milestone Summary
 
-- [ ] **M1 — MVP Defined:** Product scope and non-goals are clear.
-- [ ] **M2 — Prototype Validated:** Core MVP works with a mock frontend.
-- [ ] **M3 — Backlog Ready:** Validated MVP translated into executable GitHub Issues.
+- [X] **M1 — MVP Defined:** Product scope and non-goals are clear.
+- [X] **M2 — Prototype Validated:** Core MVP works with a mock frontend.
+- [X] **M3 — Backlog Ready:** Validated MVP translated into executable GitHub Issues.
 - [X] **M4 — Local MVP Complete:** Full-stack MVP locally accepted in #22 with persistence and documented test evidence in #20/#21/#23 (see noted test limitation).
 - [X] **M5 — Public MVP Complete:** Docker Compose, CI, public Render/Neon deployment and rollback were manually accepted (#33–#35); see #36 for milestone evidence.
-- [ ] **M6 — Production Evidence Complete:** Operations, security and audit requirements are covered.
-- [ ] **M7 — Optional Extensions Complete:** Week 5 / criterion 12 added if worthwhile.
-- [ ] **M8 — Submission Ready:** Documentation and reproducibility have been verified.
+- [ ] **M6 — Observability & Alerting Demonstrated:** One MVP journey has correlated telemetry in a UI and a working user-impact alert with verified recovery (criteria 10–11; additional-score targets).
+- [ ] **M7 — On-Call Remediation Demonstrated:** An alert wakes an agent that fixes one bounded operational failure and verifies recovery in isolation (criterion 12; additional-score target).
+- [ ] **M8 — Submission Ready:** Clean-start, CI/deployment checks and a current 12-criterion evidence map support at least 10/24 points; three peer reviews are complete.
