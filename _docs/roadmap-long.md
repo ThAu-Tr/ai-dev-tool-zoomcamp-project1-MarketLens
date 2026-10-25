@@ -276,7 +276,7 @@ For relevant features:
 - [X] Add frontend/component tests where useful.
 - [X] Test validation and failure cases.
 - [X] Keep tests runnable locally.
-- [ ] Maintain a passing test suite. (Historical passing suites are recorded in #20/#21; latest full backend run for #29 reported a date-dependent AI-context failure, so no current all-green claim.)
+- [X] Maintain a passing test suite. (`uv run pytest` — 140 passed, 0 failed; the #29 AI-context test fixtures now use observations inside the production evidence window.)
 
 Focus effort on important behavior rather than maximizing test count.
 
