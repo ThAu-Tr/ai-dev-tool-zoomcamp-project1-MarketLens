@@ -226,6 +226,11 @@ With Docker Compose installed, run these commands in PowerShell from the reposit
 
 ```powershell
 Copy-Item .env.observability.example .env.observability
+# On first setup only; do not overwrite an existing .env.observability.
+# Replace the example POSTGRES_PASSWORD in .env.observability.
+# EODHD_API_KEY, MARKETAUX_API_KEY and OPENAI_API_KEY are optional:
+# leave them blank for the Grafana/on-call demo; set them for provider features.
+# Keep the example's local OpenTelemetry and port settings for the demo.
 docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml up --build -d
 curl.exe -i http://localhost:8001/api/dashboard
 ```
