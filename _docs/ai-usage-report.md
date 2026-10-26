@@ -154,10 +154,25 @@ The user approved the issue criteria and continuation. The feature was closed on
 
 ## 4. Deployment / DevOps
 
-Not yet applicable. This example will be added during the productionization phase.
+### Task / Issue
+
+**Task:** Add production dashboard observability, alerting and a bounded on-call recovery workflow.  
+**Issues:** [#38 — Production observability](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/38), [#39 — Production alerting](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/39), [#40 — Hosted on-call responder](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40).
+
+### AI Workflow and Human Review
+
+The issue history documents iterative implementation, independent QA feedback and owner-side setup/verification. The locally isolated Grafana → alert receiver → on-call agent → Docker database restart → healthy dashboard chain was independently QA-reviewed. The owner configured the hosted Cloudflare Worker and Grafana Cloud webhook integration separately rather than handing provider credentials to Codex. During live hosted acceptance, webhook requests arrived but the Worker logged `state_or_runtime_error`; this remains an **open blocker** on #40, not a production recovery PASS.
+
+### Result
+
+- [x] Local on-call flow has historical QA evidence in #40
+- [x] Production monitoring and alerting are documented in #38 and #39
+- [ ] Hosted Cloudflare recovery accepted — **not yet verified; issue #40 remains open**
+
+Evidence: [Issue #40 and its QA discussion](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40), [on-call runbook](../README.md#local-on-call-recovery-demo-issue-40), and [CI runs](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/actions).
 
 ---
 
 ## 5. Optional Extension
 
-Not yet applicable.
+No separate optional extension evidence is claimed here; relevant post-MVP requests remain open in the [GitHub backlog](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues?q=is%3Aopen+label%3Apost-MVP).
