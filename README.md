@@ -39,6 +39,10 @@ Everyday investors often need to piece together price movements, company news, i
 
 MarketLens brings those inputs into a combined dashboard and a persistent historical price timeline. It is a monitoring and context tool—not a trading system, portfolio optimiser, or source of investment recommendations.
 
+### AI context (issue #13)
+
+MarketLens optionally generates qualified, source-linked AI context using stored market movements and news after a manual refresh. The feature is bounded by rate limits and evidence constraints; missing credentials or AI failures do not prevent prices and news from refreshing. See [AI context implementation and validation](_docs/ai-context.md) for configuration, safeguards, and testing.
+
 ## What exists today
 
 The locally accepted MVP includes a persisted dashboard; a bounded, curated stock/ETF/index catalogue; Owned and Interested watchlists with purchase lots; followed industries; manual refresh of prices through EODHD and categorized news through Marketaux; qualified, source-linked AI context; and a historical price timeline.
@@ -258,12 +262,3 @@ For local Compose persistence checks, add an asset to the watchlist and, if mark
 
 GitHub Actions runs the backend unit and integration suite, frontend tests, and production build on pull requests and pushes to `main`. Locally, run `uv sync && uv run pytest` for the backend and integration tests, then `npm ci --prefix frontend && npm --prefix frontend run test && npm --prefix frontend run build` for the frontend checks. These automated checks use local test data and do not require provider API keys.
 
-### AI context (issue #13)
-
-Set optional `OPENAI_API_KEY` in the ignored backend `.env`; `OPENAI_MODEL` defaults to `gpt-6-luna` with low reasoning effort. Apply the additive Alembic migration before running the feature. No new Python or frontend packages are required.
-
-Only manual refresh triggers AI, after prices and news have been committed. AI reads stored metadata and current movements (recent 72-hour evidence); it never requests extra market/news data. Each user has a persistent one-hour cooldown, at most two AI calls per eligible refresh, at most five ambiguous articles, five tracked assets, twelve classified articles (three per asset), 500 snippet characters per article, 1,200 output tokens per call, a 12-second timeout, and no automatic retries. Missing credentials, invalid output and quota failures leave successful market/news refresh intact. Unclassified/Not Relevant candidates remain hidden from the feed. Summaries are reused across restarts when evidence is unchanged and replaced per asset only after valid changed output.
-
-The LLM selects classifications with verified source quotations and persisted article IDs. It selects up to two relevant reports per summary; the service renders a short qualified card using only the stored exact price/movement and selected report counts/categories. Article headline/snippet prose is never quoted or paraphrased into the summary body; original metadata remains attributed in the linked news feed. This constrained rendering keeps advice, causal claims, targets, fabricated sources and unsupported confidence scores out of summary bodies without relying on a text blacklist. The persistent UI disclaimer still applies; source relevance is uncertain and the bounded evidence window may omit useful context.
-
-Optional live smoke check (not automated; incurs your own API usage): configure your key/model and use a disposable local database with a current tracked-asset price/movement and one persisted source-linked relevant article. Invoke `ContextService(ContextRepository(session), OpenAIProvider()).refresh(demo_user_id)` once from a backend Python session. This checks AI against stored evidence without new market/news calls. Then read `GET /api/dashboard` and verify one qualified card, the actual publisher link, movement, and exact uncertainty disclaimer. Repeat dashboard reads and the service call within the cooldown; they should reuse the stored card. Do not reset/delete the cooldown or retry unavailable output repeatedly. Automated tests fake all AI HTTP responses and use isolated databases; no live OpenAI check was run for this implementation.
