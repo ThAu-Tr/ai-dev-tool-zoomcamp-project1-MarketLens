@@ -142,7 +142,7 @@ The issue history documents iterative implementation, independent QA feedback an
 - [x] Production monitoring and alerting are documented in #38 and #39
 - [ ] Hosted Cloudflare recovery accepted — **not yet verified; issue #40 remains open**
 
-Evidence: [Issue #40 and its QA discussion](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40), [on-call runbook](../README.md#local-on-call-recovery-demo-issue-40), and [CI runs](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/actions).
+Evidence: [Issue #40 and its QA discussion](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40), [on-call runbook](guides/oncall-agent.md#local-on-call-recovery-demo-issue-40), and [CI runs](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/actions).
 
 ---
 
