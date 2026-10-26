@@ -1,14 +1,20 @@
 # AI-Assisted Development Evidence
 
-## Purpose
+## Development approach: ChatGPT planning and Codex implementation
 
-This document contains a small number of representative examples showing how AI was used during development.
+I used ChatGPT to identify and groom the GitHub issues I considered useful to implement next. Before assigning work to Codex, I refined each issue's scope, dependencies and acceptance criteria, and considered which tasks could proceed independently. This separated planning from implementation: Codex could focus on delivering well-defined changes and independent QA rather than repeatedly spending its limited usage allowance on issue discovery and grooming. Where dependencies allowed, I organized multiple issues for parallel work in isolated worktrees. I still reviewed the proposed tasks, decided what to prioritize, and manually accepted completed changes.
 
-Do not document every prompt or every issue. Aim for approximately 4–6 useful examples across the full project.
+The goal was to use the available Codex allowance more efficiently, not to claim measured token savings. The implementation workflow and agent roles are documented separately in [process.md](process.md); that historical process file is left unchanged.
+
+## Evidence in this report
+
+The examples below document representative planning, implementation, QA and operational work rather than every AI conversation or GitHub issue.
 
 ---
 
 ## Codex Model & Usage Comparison
+
+The following table records the models, reasoning settings and approximate five-hour Codex allowance consumed in selected implementation sessions. I tracked these sessions to compare practical usage while experimenting with parallel issue execution and different model configurations; they are observations from different tasks, not controlled measurements of model efficiency.
 
 | Issues | Model | Reasoning effort | 5-hour usage | Notes |
 | --- | --- | --- | --- | --- |
@@ -21,39 +27,6 @@ Do not document every prompt or every issue. Aim for approximately 4–6 useful 
 | #13 | GPT-6.1 Sol | Medium | 81% | Implementation, QA, and live OpenAI smoke test using "Approve for me" mode |
 
 Usage percentages reflect the reported share of the five-hour Codex allowance for each session, **not per-issue costs or measured token counts**. Tasks differed in complexity, and the Terra session also included PM work, so the figures are not a controlled model benchmark.
-
----
-
-## Example Template
-
-### Task / Issue
-
-**Task:**
-**Issue:**
-
-### AI Workflow
-
-Which AI roles or tools were used?
-
-- PM:
-- SWE:
-- QA:
-- Other:
-
-### What Happened
-
-Short summary of the useful interaction, correction or iteration.
-
-### Human Review
-
-What did you manually review, change, reject or approve?
-
-### Result
-
-- [ ] Passed first QA cycle
-- [ ] Required revision
-- [ ] Merged / completed
-- [ ] Other:
 
 ---
 
