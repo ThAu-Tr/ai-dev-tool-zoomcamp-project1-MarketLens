@@ -561,7 +561,7 @@ Good moments to capture:
 - [x] Link redacted success/failure diagnosis evidence.
 - [x] Document the user-impact alert, isolated trigger and verified recovery evidence.
 
-See [README observability guide](../README.md#local-dashboard-observability-demo-issue-38) and [production alert guide](../README.md#local-dashboard-availability-alert-issue-39).
+See [README observability guide](observability.md#local-dashboard-observability-demo-issue-38) and [production alert guide](alerting.md#local-dashboard-availability-alert-issue-39).
 
 ### After Phase 5
 
@@ -569,7 +569,7 @@ See [README observability guide](../README.md#local-dashboard-observability-demo
 - [x] Link isolated end-to-end remediation evidence, deterministic test results and verified recovery.
 - [x] Clearly mark the **unverified hosted extension** and retain QA/human acceptance records.
 
-See [local on-call runbook](../README.md#local-on-call-recovery-demo-issue-40), [issue #40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40), and [submission evidence](submission-evidence.md).
+See [local on-call runbook](oncall-agent.md#local-on-call-recovery-demo-issue-40), [issue #40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40), and [submission evidence](submission-evidence.md).
 
 ---
 
