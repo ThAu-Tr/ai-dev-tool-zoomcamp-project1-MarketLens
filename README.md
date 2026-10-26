@@ -163,6 +163,14 @@ Open [http://localhost:8000](http://localhost:8000). Compose waits for PostgreSQ
 
 The default setup uses **both** gitignored environment files: `.env` (optional `EODHD_API_KEY`, `MARKETAUX_API_KEY` and `OPENAI_API_KEY` for market/news/AI refresh) and `.env.compose` (local PostgreSQL credentials and `MARKETLENS_PORT`). The command lists `.env` first and `.env.compose` last so Compose-specific database and port settings take precedence. `DATABASE_URL` may be blank in `.env`: `compose.yaml` explicitly creates the container's database URL using the PostgreSQL `db` service, so it does not use the host/Neon URL from `.env`. With blank provider keys, the app starts but provider-dependent refreshes cannot complete. Do not commit secrets; no provider credentials are bundled in the image or repository. `MARKETLENS_PORT` changes the host port (the app remains on container port 8000).
 
+## Deployment and CI/CD
+
+GitHub Actions runs the backend unit and integration suite, frontend tests, and production build on pull requests and pushes to `main`. Locally, run `uv sync && uv run pytest` for the backend and integration tests, then `npm ci --prefix frontend && npm --prefix frontend run test && npm --prefix frontend run build` for the frontend checks. These automated checks use local test data and do not require provider API keys.
+
+### Render deployment
+
+MarketLens is deployed on [Render](https://marketlens-dtc.onrender.com/) from `main` with Docker and Neon PostgreSQL. For required environment variables, production configuration, rollback, and persistence validation, see the [deployment runbook](_docs/guides/deployment.md#render-deployment).
+
 ## Observability and operations
 
 Operational monitoring and recovery are documented in separate runbooks; the following summaries describe how to find them.
@@ -190,11 +198,3 @@ Grafana monitors dashboard availability and provides a controlled way to demonst
 An alert from the isolated Grafana stack can wake a locally running host agent that performs a bounded Docker database restart and verifies the dashboard recovered. The **hosted Cloudflare responder remains unverified** and is not part of the accepted local demonstration.
 
 **Agent startup, allowed actions, recovery test, and limitations:** [On-call agent runbook](_docs/guides/oncall-agent.md#local-on-call-recovery-demo-issue-40).
-
-## Deployment and CI/CD
-
-GitHub Actions runs the backend unit and integration suite, frontend tests, and production build on pull requests and pushes to `main`. Locally, run `uv sync && uv run pytest` for the backend and integration tests, then `npm ci --prefix frontend && npm --prefix frontend run test && npm --prefix frontend run build` for the frontend checks. These automated checks use local test data and do not require provider API keys.
-
-### Render deployment
-
-MarketLens is deployed on [Render](https://marketlens-dtc.onrender.com/) from `main` with Docker and Neon PostgreSQL. For required environment variables, production configuration, rollback, and persistence validation, see the [deployment runbook](_docs/guides/deployment.md#render-deployment).
