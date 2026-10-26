@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 from opentelemetry._logs import SeverityNumber
 from opentelemetry.sdk._logs import LoggerProvider
@@ -15,12 +17,76 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import Span, Status, StatusCode, Tracer
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
-from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter as GrpcLogExporter
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter as GrpcMetricExporter
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as GrpcSpanExporter
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter as HttpLogExporter
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter as HttpMetricExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter as HttpSpanExporter
 
 
 ROUTE = "/api/dashboard"
+DEFAULT_OTLP_ENDPOINT = "http://otel-collector:4317"
+
+
+def _parse_otlp_headers(value: str | None) -> dict[str, str] | None:
+    """Parse OTLP_HEADERS without logging or exposing credential values."""
+    if not value:
+        return None
+
+    headers: dict[str, str] = {}
+    for entry in value.split(","):
+        key, separator, encoded_value = entry.partition("=")
+        key = unquote(key.strip())
+        header_value = unquote(encoded_value.strip())
+        if (
+            not separator
+            or not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", key)
+            or "\r" in header_value
+            or "\n" in header_value
+        ):
+            raise ValueError("OTEL_EXPORTER_OTLP_HEADERS must contain comma-separated key=value headers.")
+        headers[key] = header_value
+    return headers
+
+
+def _http_signal_endpoint(endpoint: str, signal: str) -> str:
+    """Add the standard per-signal path to an OTLP/HTTP base endpoint."""
+    parsed = urlsplit(endpoint)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
+        raise ValueError("OTEL_EXPORTER_OTLP_ENDPOINT must be an HTTP(S) base URL without embedded credentials.")
+    if parsed.query or parsed.fragment:
+        raise ValueError("OTEL_EXPORTER_OTLP_ENDPOINT must not include a query or fragment.")
+    path = f"{parsed.path.rstrip('/')}/v1/{signal}"
+    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+
+
+def _create_otlp_exporters(
+    endpoint: str | None = None,
+    protocol: str | None = None,
+    raw_headers: str | None = None,
+) -> tuple[Any, Any, Any]:
+    """Build the three signal exporters from standard OTLP environment settings."""
+    endpoint = endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", DEFAULT_OTLP_ENDPOINT)
+    protocol = (protocol or os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")).strip().lower()
+    headers = _parse_otlp_headers(
+        raw_headers if raw_headers is not None else os.getenv("OTEL_EXPORTER_OTLP_HEADERS")
+    )
+
+    if protocol == "grpc":
+        insecure = urlsplit(endpoint).scheme == "http"
+        return (
+            GrpcSpanExporter(endpoint=endpoint, insecure=insecure, headers=headers),
+            GrpcMetricExporter(endpoint=endpoint, insecure=insecure, headers=headers),
+            GrpcLogExporter(endpoint=endpoint, insecure=insecure, headers=headers),
+        )
+    if protocol == "http/protobuf":
+        return (
+            HttpSpanExporter(endpoint=_http_signal_endpoint(endpoint, "traces"), headers=headers),
+            HttpMetricExporter(endpoint=_http_signal_endpoint(endpoint, "metrics"), headers=headers),
+            HttpLogExporter(endpoint=_http_signal_endpoint(endpoint, "logs"), headers=headers),
+        )
+    raise ValueError("OTEL_EXPORTER_OTLP_PROTOCOL must be grpc or http/protobuf.")
 
 
 class DashboardTelemetry:
@@ -78,7 +144,7 @@ class DashboardTelemetry:
 
 
 def create_dashboard_telemetry() -> tuple[DashboardTelemetry, Callable[[], None]]:
-    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4317")
+    trace_exporter, metric_exporter, log_exporter = _create_otlp_exporters()
     resource = Resource.create(
         {
             "service.name": "marketlens-api",
@@ -87,18 +153,18 @@ def create_dashboard_telemetry() -> tuple[DashboardTelemetry, Callable[[], None]
     )
 
     traces = TracerProvider(resource=resource)
-    traces.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True)))
+    traces.add_span_processor(BatchSpanProcessor(trace_exporter))
     metrics = MeterProvider(
         resource=resource,
         metric_readers=[
             PeriodicExportingMetricReader(
-                OTLPMetricExporter(endpoint=endpoint, insecure=True),
+                metric_exporter,
                 export_interval_millis=max(1000, int(os.getenv("OTEL_METRIC_EXPORT_INTERVAL_MILLIS", "60000"))),
             )
         ],
     )
     logs = LoggerProvider(resource=resource)
-    logs.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter(endpoint=endpoint, insecure=True)))
+    logs.add_log_record_processor(BatchLogRecordProcessor(log_exporter))
 
     telemetry = DashboardTelemetry(
         traces.get_tracer("marketlens.dashboard"),

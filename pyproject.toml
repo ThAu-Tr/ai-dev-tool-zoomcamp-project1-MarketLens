@@ -8,6 +8,7 @@ dependencies = [
   "fastapi>=0.141,<1",
   "opentelemetry-api>=1.29,<2",
   "opentelemetry-exporter-otlp-proto-grpc>=1.29,<2",
+  "opentelemetry-exporter-otlp-proto-http>=1.29,<2",
   "opentelemetry-sdk>=1.29,<2",
   "psycopg[binary]>=3.2,<4",
   "sqlalchemy>=2.0,<3",

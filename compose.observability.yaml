@@ -22,8 +22,14 @@ services:
       CORS_ALLOWED_ORIGINS: http://localhost:8001
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       OTEL_ENVIRONMENT: local-demo
       OTEL_METRIC_EXPORT_INTERVAL_MILLIS: 5000
+      EODHD_API_KEY: ${EODHD_API_KEY:-}
+      MARKETAUX_API_KEY: ${MARKETAUX_API_KEY:-}
+      MARKETAUX_USER_AGENT: ${MARKETAUX_USER_AGENT:-MarketLens/0.1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-luna}
     ports:
       - "127.0.0.1:${MARKETLENS_PORT:-8001}:8000"
     depends_on:
