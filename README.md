@@ -20,12 +20,14 @@
 
 ## Quick start with Docker Compose
 
-**Prerequisites:** Git and Docker Desktop with Docker Compose. From the repository root, use PowerShell:
+**Prerequisites:** Git and Docker Desktop with Docker Compose. From the repository root, use PowerShell (copy the example files only on first setup; do not overwrite existing local files containing credentials):
 
 ```powershell
+Copy-Item .env.example .env
 Copy-Item .env.compose.example .env.compose
+# Set provider keys in .env (optional for startup; needed for refresh).
 # Replace the sample local database password in .env.compose.
-docker compose --env-file .env.compose up --build
+docker compose --env-file .env --env-file .env.compose up --build
 ```
 
 Open **http://localhost:8000**. Compose starts the application and PostgreSQL and applies Alembic migrations on startup. Market-data, news and AI refreshes require your own optional API keys; the application itself can start without them. If you already store API keys in a local, gitignored `.env`, start Compose with both files: `docker compose --env-file .env --env-file .env.compose up --build`. The latter file takes precedence for overlapping variables, keeping Compose database settings intact. Stop with `Ctrl+C` and `docker compose --env-file .env.compose down` (keeps the database volume). See [Run with Docker Compose](#run-with-docker-compose) for persistence, options and troubleshooting context.
@@ -186,17 +188,19 @@ The project owner reports manually checking the hosted application's persistence
 
 ## Run with Docker Compose
 
-With Docker Desktop (including Compose) installed, start the app and PostgreSQL from the repository root:
+With Docker Desktop (including Compose) installed, start the app and PostgreSQL from the repository root. Copy both examples **only if the destination files do not already exist**, to avoid overwriting your own settings or secrets:
 
 ```powershell
+Copy-Item .env.example .env
 Copy-Item .env.compose.example .env.compose
+# Put your EODHD, Marketaux and OpenAI keys in .env if you want refresh features.
 # Edit .env.compose and replace the example local database password.
-docker compose --env-file .env.compose up --build
+docker compose --env-file .env --env-file .env.compose up --build
 ```
 
-Open [http://localhost:8000](http://localhost:8000). Compose waits for PostgreSQL readiness, and the app applies Alembic migrations before starting. The `postgres_data` volume keeps the watchlist, purchase lots, and other stored data across app restarts. Stop with `Ctrl+C`, then run `docker compose --env-file .env.compose down`; this preserves the database volume. To remove the stored database as well, run `docker compose --env-file .env.compose down --volumes`.
+Open [http://localhost:8000](http://localhost:8000). Compose waits for PostgreSQL readiness, and the app applies Alembic migrations before starting. The `postgres_data` volume keeps the watchlist, purchase lots, and other stored data across app restarts. Stop with `Ctrl+C`, then run `docker compose --env-file .env --env-file .env.compose down`; this preserves the database volume. To remove the stored database as well, run `docker compose --env-file .env --env-file .env.compose down --volumes`.
 
-The example `.env.compose` contains only local database and port settings. To enable provider-dependent features, supply your own `EODHD_API_KEY`, `MARKETAUX_API_KEY`, and `OPENAI_API_KEY` through either `.env.compose` or an existing **gitignored** `.env` file. If using both files, run `docker compose --env-file .env --env-file .env.compose up --build` so values from `.env.compose` override any overlapping database/port settings from `.env` while API keys remain available. A command using only `--env-file .env.compose` does **not** load provider keys from `.env`. No provider credentials are included in the image or repository. Keys are optional for startup, but refresh features depend on them. `MARKETLENS_PORT` changes the host port (the app remains on container port 8000).
+The default setup uses **both** gitignored environment files: `.env` (optional `EODHD_API_KEY`, `MARKETAUX_API_KEY` and `OPENAI_API_KEY` for market/news/AI refresh) and `.env.compose` (local PostgreSQL credentials and `MARKETLENS_PORT`). The command lists `.env` first and `.env.compose` last so Compose-specific database and port settings take precedence. With blank provider keys, the app starts but provider-dependent refreshes cannot complete. Do not commit secrets; no provider credentials are bundled in the image or repository. `MARKETLENS_PORT` changes the host port (the app remains on container port 8000).
 
 ### Local dashboard observability demo (issue #38)
 
