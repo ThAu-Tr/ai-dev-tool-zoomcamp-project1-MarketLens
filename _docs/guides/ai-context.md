@@ -1,6 +1,6 @@
 # AI Context — Feature Implementation and Validation
 
-This document contains the technical details for the optional AI context feature (issue #13), extracted from the README. The [README](../README.md) remains the project entry point.
+This document contains the technical details for the optional AI context feature (issue #13), extracted from the README. The [README](../../README.md) remains the project entry point.
 
 ### AI context (issue #13)
 

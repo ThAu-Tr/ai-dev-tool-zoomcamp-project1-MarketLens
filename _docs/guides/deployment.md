@@ -1,6 +1,6 @@
 # Render deployment and rollback
 
-Detailed deployment notes for MarketLens. For the quickest local installation, see the [README Docker quick start](../README.md#quick-start-with-docker-compose).
+Detailed deployment notes for MarketLens. For the quickest local installation, see the [README Docker quick start](../../README.md#quick-start-with-docker-compose).
 
 ## Render deployment
 
@@ -27,4 +27,4 @@ The project owner reports manually verifying deployment through CI/CD, saved wat
 
 To roll back, open the service's **Deploys** page in the [Render Dashboard](https://dashboard.render.com/), choose a previous successful deploy, and select **Rollback**. A dashboard rollback disables automatic deploys; re-enable them from the service **Settings** page when ready. A code rollback does not roll back Neon schema migrations or database data, so confirm the selected application version is compatible with the current database schema. See [Render's rollback guide](https://render.com/docs/rollbacks).
 
-For local Compose persistence checks, add an asset to the watchlist and, if marking it Owned, save purchase lots. Stop and restart using the [README Compose instructions](../README.md#run-with-docker-compose), then confirm the asset and lots remain. `docker compose --env-file .env --env-file .env.compose logs app` shows startup and migration output. This local setup does not publish the app to the internet.
+For local Compose persistence checks, add an asset to the watchlist and, if marking it Owned, save purchase lots. Stop and restart using the [README Compose instructions](../../README.md#run-with-docker-compose), then confirm the asset and lots remain. `docker compose --env-file .env --env-file .env.compose logs app` shows startup and migration output. This local setup does not publish the app to the internet.

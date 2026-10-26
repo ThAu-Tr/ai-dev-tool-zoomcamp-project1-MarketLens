@@ -12,7 +12,7 @@
 | --- | --- |
 | Live demo | [MarketLens on Render](https://marketlens-dtc.onrender.com/) |
 | Local startup | [Quick start with Docker Compose](#quick-start-with-docker-compose) |
-| Tests and CI/CD | [Running checks](#running-checks) · [GitHub Actions](.github/workflows/) |
+| Tests and CI/CD | [Running checks](#running-checks) · [GitHub Actions](.github/workflows) |
 | Architecture and API | [Architecture](#architecture) · [OpenAPI contract](openapi.yaml) |
 | AI-assisted engineering | [Development process](_docs/process.md) · [Agent instructions](AGENTS.md) · [AI usage report](_docs/ai-usage-report.md) |
 | Observability, alerts and recovery | [Local observability](#local-dashboard-observability-demo-issue-38) · [Grafana Cloud](#grafana-cloud-export-for-the-deployed-dashboard) · [On-call demo](#local-on-call-recovery-demo-issue-40) |
@@ -47,7 +47,7 @@ The asset picker searches a local catalogue rather than the provider's entire su
 
 ### AI context (issue #13)
 
-MarketLens optionally generates qualified, source-linked AI context using stored market movements and news after a manual refresh. The feature is bounded by rate limits and evidence constraints; missing credentials or AI failures do not prevent prices and news from refreshing. See [AI context implementation and validation](_docs/ai-context.md) for configuration, safeguards, and testing.
+MarketLens optionally generates qualified, source-linked AI context using stored market movements and news after a manual refresh. The feature is bounded by rate limits and evidence constraints; missing credentials or AI failures do not prevent prices and news from refreshing. See [AI context implementation and validation](_docs/guides/ai-context.md) for configuration, safeguards, and testing.
 
 ## Demo
 
@@ -113,13 +113,13 @@ MarketLens was developed through GitHub issues with an AI-assisted Engineer → 
 - [Agent instructions](AGENTS.md) and [development process](_docs/process.md)
 - [AI-assisted workflow evidence](_docs/ai-usage-report.md)
 - [Architecture decisions](_docs/architecture.md), [product specification](_docs/plan.md), and [backlog](_docs/backlog.md)
-- [GitHub issue history](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues) and [GitHub Actions checks](.github/workflows/)
+- [GitHub issue history](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues) and [GitHub Actions checks](.github/workflows)
 
 The hosted production on-call extension is tracked separately in [#40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40); local acceptance and production acceptance are not interchangeable.
 
 ## Running checks
 
-GitHub Actions runs backend unit/integration tests, frontend tests, and the frontend production build. The integration suite uses isolated SQLite and mocked providers; it does not establish live provider or PostgreSQL compatibility. See [testing and verification](_docs/testing.md#automated-checks-and-test-coverage) for commands, coverage, and limitations.
+GitHub Actions runs backend unit/integration tests, frontend tests, and the frontend production build. The integration suite uses isolated SQLite and mocked providers; it does not establish live provider or PostgreSQL compatibility. See [testing and verification](_docs/guides/testing.md#automated-checks-and-test-coverage) for commands, coverage, and limitations.
 
 ## Local development and configuration
 
@@ -171,25 +171,25 @@ Operational monitoring and recovery are documented in separate runbooks; the fol
 
 The separate `compose.observability.yaml` stack runs an isolated application at `http://localhost:8001` and Grafana at `http://localhost:3000`. Copy `.env.observability.example` to `.env.observability` on first setup; replace its example database password. Provider API keys are optional for the monitoring/on-call demo (add them only for live refresh features). The regular Docker application remains on port `8000`. The receiver feed is loopback-only on `127.0.0.1:8081`, and Prometheus uses `9090`.
 
-**Full setup, environment notes, metrics, traces, and fault-injection guide:** [Observability runbook](_docs/observability.md#local-dashboard-observability-demo-issue-38).
+**Full setup, environment notes, metrics, traces, and fault-injection guide:** [Observability runbook](_docs/guides/observability.md#local-dashboard-observability-demo-issue-38).
 
 ### Grafana Cloud export for the deployed dashboard
 
 The deployed dashboard can export scoped OpenTelemetry signals to Grafana Cloud using Render environment configuration. This is separate from the local LGTM demo.
 
-**Full setup and troubleshooting:** [Observability runbook](_docs/observability.md#grafana-cloud-export-for-the-deployed-dashboard).
+**Full setup and troubleshooting:** [Observability runbook](_docs/guides/observability.md#grafana-cloud-export-for-the-deployed-dashboard).
 
 ### Local dashboard availability alert (issue #39)
 
 Grafana monitors dashboard availability and provides a controlled way to demonstrate user-impact alerting in the isolated local environment; the production Grafana Cloud alert is documented separately.
 
-**Alert rules, notifications, safe tests, and evidence:** [Alerting runbook](_docs/alerting.md#local-dashboard-availability-alert-issue-39).
+**Alert rules, notifications, safe tests, and evidence:** [Alerting runbook](_docs/guides/alerting.md#local-dashboard-availability-alert-issue-39).
 
 ### Local on-call recovery demo (issue #40)
 
 An alert from the isolated Grafana stack can wake a locally running host agent that performs a bounded Docker database restart and verifies the dashboard recovered. The **hosted Cloudflare responder remains unverified** and is not part of the accepted local demonstration.
 
-**Agent startup, allowed actions, recovery test, and limitations:** [On-call agent runbook](_docs/oncall-agent.md#local-on-call-recovery-demo-issue-40).
+**Agent startup, allowed actions, recovery test, and limitations:** [On-call agent runbook](_docs/guides/oncall-agent.md#local-on-call-recovery-demo-issue-40).
 
 ## Deployment and CI/CD
 
@@ -197,4 +197,4 @@ GitHub Actions runs the backend unit and integration suite, frontend tests, and 
 
 ### Render deployment
 
-MarketLens is deployed on [Render](https://marketlens-dtc.onrender.com/) from `main` with Docker and Neon PostgreSQL. For required environment variables, production configuration, rollback, and persistence validation, see the [deployment runbook](_docs/deployment.md#render-deployment).
+MarketLens is deployed on [Render](https://marketlens-dtc.onrender.com/) from `main` with Docker and Neon PostgreSQL. For required environment variables, production configuration, rollback, and persistence validation, see the [deployment runbook](_docs/guides/deployment.md#render-deployment).
