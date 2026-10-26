@@ -205,152 +205,27 @@ The default setup uses **both** gitignored environment files: `.env` (optional `
 
 ### Local dashboard observability demo (issue #38)
 
-The observability/on-call demo uses a **separate, isolated Docker Compose project** from the normal local application. These are the default local addresses:
+The separate `compose.observability.yaml` stack runs an isolated application at `http://localhost:8001` and Grafana at `http://localhost:3000`. Copy `.env.observability.example` to `.env.observability` on first setup; replace its example database password. Provider API keys are optional for the monitoring/on-call demo (add them only for live refresh features). The regular Docker application remains on port `8000`. The receiver feed is loopback-only on `127.0.0.1:8081`, and Prometheus uses `9090`.
 
-| Service | Local address | Purpose |
-| --- | --- | --- |
-| Regular MarketLens app | `http://localhost:8000` | Standard local Compose setup (`compose.yaml`) |
-| Observability demo app | `http://localhost:8001` | Isolated dashboard for alert and recovery testing |
-| Grafana | `http://localhost:3000` | Metrics, traces, logs and local alerts |
-| On-call receiver feed | `http://127.0.0.1:8081` | Loopback-only sanitized events consumed by the host agent |
-| Prometheus | `http://localhost:9090` | Local metrics storage and queries |
-
-The observability app's port and receiver-feed port can be overridden with `MARKETLENS_PORT` and `ONCALL_FEED_PORT` in `.env.observability`. The on-call agent itself runs as a separate host process, not as another public HTTP service. Never fault-inject the normal application or production database.
-
-
-The optional LGTM stack instruments only the stored `GET /api/dashboard` journey. The React request creates a W3C `traceparent`; FastAPI extracts it and creates the server span, then a repository-boundary span covers the PostgreSQL read. Request count, latency, and a structured request log carry the same trace ID. Other routes and the normal Compose/Render deployment remain uninstrumented. The app exports to the local collector over gRPC by default, or directly to a configured OTLP endpoint over HTTP/protobuf.
-
-Telemetry is deliberately limited to service/environment, route template, method, status, duration, outcome, exception class, and trace/span IDs. It does not record headers, query strings, SQL text or parameters, exception messages, request/response bodies, asset or article identifiers, holdings, quantities, or values. The isolated local stack stores telemetry in local Docker volumes with 24-hour retention for traces, logs, and metrics; Grafana uses the local demo login `admin` / `admin`. By default no telemetry is sent outside the local stack. Direct Grafana Cloud export is enabled only when explicitly configured in the deployed service environment.
-
-With Docker Compose installed, run these commands in PowerShell from the repository root:
-
-```powershell
-Copy-Item .env.observability.example .env.observability
-# On first setup only; do not overwrite an existing .env.observability.
-# Replace the example POSTGRES_PASSWORD in .env.observability.
-# EODHD_API_KEY, MARKETAUX_API_KEY and OPENAI_API_KEY are optional:
-# leave them blank for the Grafana/on-call demo; set them for provider features.
-# Keep the example's local OpenTelemetry and port settings for the demo.
-docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml up --build -d
-curl.exe -i http://localhost:8001/api/dashboard
-```
-
-The separate project has its own PostgreSQL data volume and starts with the migrated demo user, so the dashboard request returns `200` without provider calls. To load live prices in this local demo, add your own `EODHD_API_KEY` to the ignored `.env.observability` file and use the dashboard's **Refresh data** action. The app service passes optional local provider keys through to the app container; no provider calls happen on startup or dashboard reads. Marketaux and OpenAI keys are optional for their respective features. The on-call receiver does not receive these keys.
-
-To produce a controlled database failure only in this isolated project, run:
-
-```powershell
-docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml stop db
-curl.exe -i http://localhost:8001/api/dashboard
-docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml start db
-```
-
-The second request returns `500` while the local database is stopped. Open [Grafana](http://localhost:3000), sign in with the local demo login, and use **Explore**: Prometheus query `marketlens_dashboard_requests_total` shows successes/failures and `marketlens_dashboard_duration_milliseconds_bucket` shows latency; Tempo can open the trace ID; Loki shows `dashboard_request` records. Each signal includes `trace_id`, so paste the same ID into Tempo and compare the matching Loki log and metric sample. The trace shows the `/api/dashboard` span and PostgreSQL read boundary; its status and exception class diagnose failure while the log provides the matching route/outcome, without storing database error text.
-
-Observed on the local demo stack: Prometheus contained one `200/success` sample and one `500/failure` sample; Tempo showed both dashboard traces with the `dashboard.repository.read` child span; Loki showed two `dashboard_request` records. The redacted trace IDs matched between all three signals (`961f8f98…` success, `a4c39f9a…` failure). The [local Grafana Explore UI](http://localhost:3000/explore) opens the provisioned data sources and shows the request metric, traces, and correlated logs.
-
-Stop the demo with `docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml down`. Add `--volumes` to remove its isolated data and telemetry. The stack is bound to localhost and must not be exposed as a production service.
+**Full setup, environment notes, metrics, traces, and fault-injection guide:** [Observability runbook](_docs/observability.md#local-dashboard-observability-demo-issue-38).
 
 ### Grafana Cloud export for the deployed dashboard
 
-The deployed app can export the same dashboard-only signals directly to Grafana Cloud; it does not need the local collector. In Grafana Cloud, open your stack's **Configure → OpenTelemetry** setup and copy the stack-specific OTLP endpoint and generated authentication header. In Render, add these variables to the MarketLens web service's Environment settings:
+The deployed dashboard can export scoped OpenTelemetry signals to Grafana Cloud using Render environment configuration. This is separate from the local LGTM demo.
 
-| Variable | Value |
-| --- | --- |
-| `OTEL_ENABLED` | `true` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | The base endpoint from Grafana Cloud, including `/otlp` and excluding `/v1/traces`, `/v1/metrics`, or `/v1/logs` |
-| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` |
-| `OTEL_EXPORTER_OTLP_HEADERS` | The generated header from Grafana Cloud, formatted as `Authorization=Basic%20<generated-value>` |
-| `OTEL_ENVIRONMENT` | `production` |
-| `OTEL_METRIC_EXPORT_INTERVAL_MILLIS` | `15000` (optional; defaults to 60000) |
-
-Enter the generated header directly in Render's environment settings; never commit it or send it to Codex. Do not use the local collector hostname in Render. The exporter appends the per-signal path to the base endpoint. Render restarts the service after environment changes. The React app and database configuration do not need changes.
-
-To verify export, load the deployed dashboard at [https://marketlens-dtc.onrender.com/](https://marketlens-dtc.onrender.com/) and reload it once. In the same Grafana Cloud stack, search Tempo for service `marketlens-api` and a recent `GET /api/dashboard` span. Copy its trace ID, then find the log record with body `dashboard_request` and the same `trace_id`. The request metric has that `trace_id` attribute; query `marketlens_dashboard_requests_total{trace_id="<trace-id>"}` in the stack's Metrics/Explore view. Confirm the status/outcome and duration attributes match the trace. Allow up to a minute for metrics at the default export interval. If signals are missing, check Render logs for exporter connection or authorization errors; do not expose the header value in logs or support requests.
+**Full setup and troubleshooting:** [Observability runbook](_docs/observability.md#grafana-cloud-export-for-the-deployed-dashboard).
 
 ### Local dashboard availability alert (issue #39)
 
-The local Grafana rule `Dashboard unavailable` evaluates every 10 seconds and fires when at least one dashboard HTTP 5xx is observed in the rolling previous minute. It resolves after a full minute without a dashboard failure. Alert math uses a dedicated low-cardinality failure counter because the trace-correlated request counter has one unique trace ID per series and cannot produce a meaningful rolling increase. The local demo exports metrics every 5 seconds for a responsive demonstration. Grafana sends firing and resolved notifications to an internal-only webhook in the isolated Compose network. The receiver retains only the alert state, static rule name/severity/journey, a validated trace ID if a future rule supplies one, and the Grafana fingerprint/start time; repeated deliveries for the same alert transition are idempotent. It drops annotations, URLs, arbitrary labels, request data, and credentials. Its webhook contract is a local hand-off surface that a later on-call responder can consume.
+Grafana monitors dashboard availability and provides a controlled way to demonstrate user-impact alerting in the isolated local environment; the production Grafana Cloud alert is documented separately.
 
-Start or rebuild the optional stack using the #38 commands above. Reproduce and recover without contacting external providers:
-
-```powershell
-docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml stop db
-curl.exe -i http://localhost:8001/api/dashboard
-docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml logs --since 2m alert-receiver
-docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml start db
-curl.exe -i http://localhost:8001/api/dashboard
-```
-
-The stopped database produces HTTP 500; the alert receiver logs one redacted `firing` event. After PostgreSQL is healthy, the dashboard returns HTTP 200 and Grafana delivers `resolved` after the failure leaves the one-minute window. In Grafana **Alerting → Alert rules**, verify `Dashboard unavailable` returns to **Normal**. The delivery contains the alert fingerprint and static journey/route/status class. To find the corresponding trace, open Loki in Explore and query `{service_name="marketlens-api"} |= "dashboard_request"`; select the matching time and use its configured trace link to Tempo. The alert threshold, delivery and recovery tests are in `tests/test_alert_receiver.py`. Do not stop a database outside this isolated observability project.
-
-Redacted local run evidence (same fingerprint for firing and recovery; repeated webhook posts produced no duplicate `alert_delivery` record):
-
-```text
-2026-10-25T19:35:15Z alert_delivery {"fingerprint":"0850647b23910719","labels":{"alert_id":"dashboard-availability","alertname":"Dashboard unavailable","http_request_method":"GET","http_response_status_class":"5xx","http_route":"/api/dashboard","journey":"dashboard","journey_outcome":"failure","severity":"critical"},"startsAt":"2026-10-25T19:34:40Z","status":"firing"}
-2026-10-25T19:35:45Z alert_delivery {"fingerprint":"0850647b23910719","labels":{"alert_id":"dashboard-availability","alertname":"Dashboard unavailable","http_request_method":"GET","http_response_status_class":"5xx","http_route":"/api/dashboard","journey":"dashboard","journey_outcome":"failure","severity":"critical"},"startsAt":"2026-10-25T19:34:40Z","status":"resolved"}
-```
-
-#### Production alert in Grafana Cloud
-
-The local alert above remains the safe fault-injection demo. For production, reuse the owner-managed Synthetic Monitoring check `marketlens-production-dashboard`; do not create a duplicate. The check should remain a public HTTP `GET` to `https://marketlens-dtc.onrender.com/api/dashboard`, accept only HTTP 200, run every 5 minutes from one European probe, and use a 60-second timeout. Render Free services can sleep after 15 minutes idle and take about one minute to wake, so a single timed-out probe is expected to be transient; the timeout plus the repeated-failure threshold below prevents one cold start from paging. Keep the existing frequency and probe count to avoid extra check executions.
-
-In Grafana Cloud, open **Testing & synthetics → Synthetics → Checks**, edit the existing check, confirm its target/method/status/frequency/probe, set **Timeout** to 60 seconds, and save. Verify the `job` label is `marketlens-production-dashboard` and `instance` is the API URL in **Explore → Metrics** with `probe_success`. Grafana's Synthetic Monitoring labels use the configured job name as `job`, the target as `instance`, and the location as `probe` ([check metrics and labels](https://grafana.com/docs/grafana-cloud/observe-and-act/testing/synthetic-monitoring/create-checks/checks/)).
-
-Create one **Grafana-managed** alert rule in the existing Grafana Cloud stack using its Prometheus/Mimir data source. Call it `MarketLensProductionDashboardUnavailable`; evaluate every **1 minute**, set the pending period to **1 minute**, and alert when query A is **above 0.5**. This query counts actual failed probe samples in a rolling 15-minute window (a success is 1, a failure is 0) and returns 0 while healthy, so a single Render cold-start miss does not fire:
-
-```promql
-(
-  sum by (job, instance, probe) (
-    count_over_time(probe_success{
-      job="marketlens-production-dashboard",
-      instance="https://marketlens-dtc.onrender.com/api/dashboard"
-    }[15m])
-    -
-    sum_over_time(probe_success{
-      job="marketlens-production-dashboard",
-      instance="https://marketlens-dtc.onrender.com/api/dashboard"
-    }[15m])
-  )
-) >= bool 2
-```
-
-If the `job` label in your check differs, use the exact value shown by `probe_success`; keep the URL filter exact. Add these rule labels: `service=marketlens`, `environment=production`, `source=synthetic`, and `severity=critical`. Set the summary annotation to `MarketLens production dashboard API is unavailable` and the description to `Synthetic check {{ $labels.job }} for {{ $labels.instance }} at probe {{ $labels.probe }} recorded at least 2 failures in 15m. Check its recent results in Synthetic Monitoring.` Do not include response bodies or other request data. Set **No data** and **Error** handling to **Keep last state**: probe failures are reported as `probe_success=0`, while missing check telemetry is a monitoring-pipeline issue to inspect separately. The rule resolves once fewer than two failed samples remain in the rolling window and the pending period clears.
-
-For email delivery, go to **Alerts & IRM → Alerting → Notification configuration → Contact points** and create an **Email** contact point for your own address. Test it there. Then create a child notification policy matching `service=marketlens`, `environment=production`, and `source=synthetic`; select that email contact point, keep resolved notifications enabled, group by `alertname`, `job`, and `instance`, set group wait to **30 seconds**, group interval to **5 minutes**, and repeat interval to **4 hours**. Keep these labels stable so a future owner-managed webhook route can be added without changing the alert rule. Grafana Cloud provides email delivery without a self-managed SMTP server ([contact points](https://grafana.com/docs/grafana-cloud/alerting-and-irm/alerting/configure-notifications/manage-contact-points/), [email integration](https://grafana.com/docs/grafana-cloud/alerting-and-irm/alerting/configure-notifications/manage-contact-points/integrations/configure-email/), [notification policies](https://grafana.com/docs/grafana-cloud/observe-and-act/alert-and-measure-reliability/alerting/configure-notifications/create-notification-policy/)).
-
-Validate without taking production down: (1) confirm the existing check is enabled and its latest result is green/HTTP 200; (2) send Grafana's test notification from the email contact point and confirm receipt; (3) create a temporary, clearly named `MarketLensNotificationRouteTest` rule using the same notification labels, PromQL `vector(1)`, and a condition above 0.5; confirm a firing email; change it to `vector(0)`, confirm a resolved email, then delete the temporary rule. This tests notification routing only; it is simulated evidence, not a real production outage. The real production threshold is passively verified from the existing check with `probe_success{job="marketlens-production-dashboard",instance="https://marketlens-dtc.onrender.com/api/dashboard"}`: healthy is 1; repeated check failure is 0. Render Free can take about one minute to wake ([Render Free services](https://render.com/docs/free)); do not inject a failure into Render or Neon. Grafana Cloud account configuration and email receipt must be verified by the owner; Codex has no account access.
+**Alert rules, notifications, safe tests, and evidence:** [Alerting runbook](_docs/alerting.md#local-dashboard-availability-alert-issue-39).
 
 ### Local on-call recovery demo (issue #40)
 
-This reuses only the optional `marketlens-observability` Compose stack. Keep the host agent running before fault injection so it detects the real Grafana event automatically. The receiver feed is published on loopback only (`127.0.0.1:8081`); it exposes sanitized alert events, never a command endpoint.
+An alert from the isolated Grafana stack can wake a locally running host agent that performs a bounded Docker database restart and verifies the dashboard recovered. The **hosted Cloudflare responder remains unverified** and is not part of the accepted local demonstration.
 
-In terminal 1, start the isolated stack as above and run the host agent from the repository root:
-
-```powershell
-uv run python -m app.oncall_agent
-```
-
-Wait for `oncall status=ready`. In terminal 2, create the approved isolated fault and inspect the dashboard:
-
-```powershell
-docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml stop db
-curl.exe -i http://127.0.0.1:8001/api/dashboard
-```
-
-Grafana's real dashboard availability notification reaches the receiver; the agent reads the sanitized event feed, verifies the fixed project/service labels and that the DB is stopped or running unhealthy, then runs the same single action in either case: `docker compose ... restart db`. Compose restart was verified to start the stopped isolated DB. The agent checks the DB health and polls `/api/dashboard` for HTTP 200 before logging `oncall status=recovered`. Grafana later sends `resolved`; the agent rechecks the dashboard before logging `resolved_verified`. Keep the agent process running through recovery and resolution. The agent writes only the validated alert fingerprint, start time, and state (`attempted`, `recovered`, or `resolved`) to an atomically replaced, gitignored `.oncall-agent-state.json` file. On restart, replayed firing alerts escalate without another action; resolved alerts are acknowledged only when a prior recovery was recorded and the dashboard is currently healthy. Missing/corrupt state, unknown alerts, a healthy DB, duplicate events, or failed verification produce an escalation with no retry. It does not connect to Render or providers, accept shell input, or access any other Compose project. Audit output contains only allowlisted status/action values and no request or database payloads.
-
-The receiver's GET `/agent/events?after=N` endpoint is read-only and returns only its redacted delivery registry. The first repeated firing delivery adds one redacted `repeated` feed event; the poller explicitly escalates it as `oncall status=escalated reason=repeated_alert` without taking a second action. Further repeats of that same firing are coalesced. Tests cover the single fixed-target restart for stopped and unhealthy states, durable replay across agent restarts, end-to-end receiver/feed/poller wake-up, unexpected labels, already-healthy state, repeated alerts, and failed health/dashboard verification. The real end-to-end chain requires Docker and the optional local observability stack; verify the firing and resolved `oncall` records in the terminal and the alert state under Grafana **Alerting → Alert rules**. Never stop a database outside this isolated project.
-
-Redacted automatic recovery evidence (2026-10-25 UTC; one allowed `restart db`, no duplicate action):
-
-```text
-20:08:40Z  dashboard fault injected only by stopping marketlens-observability/db; /api/dashboard returned HTTP 500
-20:09:14Z  alert_delivery status=firing fingerprint=0850647b23910719
-20:09:24Z  oncall status=recovered action=restart dashboard=healthy; marketlens-observability/db healthy; /api/dashboard returned HTTP 200
-20:09:44Z  alert_delivery status=resolved fingerprint=0850647b23910719
-20:09:46Z  oncall status=resolved_verified
-```
+**Agent startup, allowed actions, recovery test, and limitations:** [On-call agent runbook](_docs/oncall-agent.md#local-on-call-recovery-demo-issue-40).
 
 ### Render deployment
 
