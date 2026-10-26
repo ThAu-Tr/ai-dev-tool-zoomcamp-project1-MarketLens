@@ -1,8 +1,34 @@
 # MarketLens
 
-MarketLens is a lightweight investment-monitoring application for everyday investors who want to follow stocks, ETFs, and major indices in one place. It combines price movement with relevant news and carefully qualified AI context so users can understand possible market context without receiving investment advice.
+**MarketLens** is a lightweight investment-monitoring dashboard for everyday investors. It brings together tracked stocks, ETFs and indices, price history, relevant news, and qualified AI-generated market context. It is an educational monitoring tool, **not** a trading platform or source of investment advice.
 
-> **Project status:** M4 local MVP accepted ([human acceptance #22](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/22)); milestone documentation is tracked in [#23](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/23). The M5 Docker deployment is live at [marketlens-dtc.onrender.com](https://marketlens-dtc.onrender.com/); deployment checks are summarized below as owner-reported.
+**[Open the live application](https://marketlens-dtc.onrender.com/)** · **[Project issues](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues)** · **[Development workflow](_docs/process.md)** · **[AI-assisted development evidence](_docs/ai-usage-report.md)**
+
+> **Project status (October 2026):** The locally accepted MVP is deployed publicly on Render. Production dashboard observability and Grafana Cloud monitoring are documented below. The local on-call demonstration has independent QA evidence; the separate hosted Cloudflare responder is still undergoing deployment/acceptance debugging under [issue #40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40). Do not treat hosted recovery as verified.
+
+## Reviewer quick links
+
+| What to review | Where |
+| --- | --- |
+| Live demo | [MarketLens on Render](https://marketlens-dtc.onrender.com/) |
+| Local startup | [Quick start with Docker Compose](#quick-start-with-docker-compose) |
+| Tests and CI/CD | [Running checks](#running-checks) · [GitHub Actions](.github/workflows/) |
+| Architecture and API | [Architecture](#architecture) · [OpenAPI contract](openapi.yaml) |
+| AI-assisted engineering | [Development process](_docs/process.md) · [Agent instructions](AGENTS.md) · [AI usage report](_docs/ai-usage-report.md) |
+| Observability, alerts and recovery | [Local observability](#local-dashboard-observability-demo-issue-38) · [Grafana Cloud](#grafana-cloud-export-for-the-deployed-dashboard) · [On-call demo](#local-on-call-recovery-demo-issue-40) |
+| Scope and limitations | [MVP scope](#mvp-scope) · [Limitations](#limitations-and-future-work) |
+
+## Quick start with Docker Compose
+
+**Prerequisites:** Git and Docker Desktop with Docker Compose. From the repository root, use PowerShell:
+
+```powershell
+Copy-Item .env.compose.example .env.compose
+# Replace the sample local database password in .env.compose.
+docker compose --env-file .env.compose up --build
+```
+
+Open **http://localhost:8000**. Compose starts the application and PostgreSQL and applies Alembic migrations on startup. Market-data, news and AI refreshes require your own optional API keys; the application itself can start without them. Stop with `Ctrl+C` and `docker compose --env-file .env.compose down` (keeps the database volume). See [Run with Docker Compose](#run-with-docker-compose) for persistence, options and troubleshooting context.
 
 ## The problem
 
@@ -18,7 +44,7 @@ The asset picker searches a local catalogue rather than the provider's entire su
 
 ## Demo
 
-Try the live application at [https://marketlens-dtc.onrender.com/](https://marketlens-dtc.onrender.com/). A separate video or screenshot walkthrough is not currently linked.
+Try the [live MarketLens application](https://marketlens-dtc.onrender.com/). On Render Free, the first request after inactivity may take longer while the service wakes up. A screenshot or video walkthrough has not yet been added; the public app is the primary demo.
 
 ## MVP scope
 
@@ -73,6 +99,17 @@ The MVP is implemented as small, end-to-end GitHub issues rather than separate f
 - [Development workflow](_docs/process.md)
 - [Representative AI-assisted workflow evidence](_docs/ai-usage-report.md)
 
+## AI-assisted development and review evidence
+
+MarketLens was developed through GitHub issues with an AI-assisted Engineer → independent QA workflow. The orchestrator coordinates work, QA reports PASS/FAIL against issue acceptance criteria, and **only the human owner closes an issue after manual acceptance**. This makes implementation decisions, corrections and acceptance evidence reviewable.
+
+- [Agent instructions](AGENTS.md) and [development process](_docs/process.md)
+- [AI-assisted workflow evidence](_docs/ai-usage-report.md)
+- [Architecture decisions](_docs/architecture.md), [product specification](_docs/plan.md), and [backlog](_docs/backlog.md)
+- [GitHub issue history](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues) and [GitHub Actions checks](.github/workflows/)
+
+The hosted production on-call extension is tracked separately in [#40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40); local acceptance and production acceptance are not interchangeable.
+
 ## Running checks
 
 Backend tests:
@@ -125,7 +162,7 @@ npm --prefix frontend run dev
 
 The FastAPI backend permits configured frontend origins through `CORS_ALLOWED_ORIGINS` (default `http://localhost:5173`; see `.env.example`). If using another frontend origin, explicitly configure it. Keep EODHD, Marketaux, and OpenAI keys on the backend only. Apply `uv run alembic upgrade head` after updating the application code and before starting the backend.
 
-// TODO (M8): Complete the local setup guide: add PostgreSQL installation/database/user provisioning and prerequisite steps, then independently verify the documented backend startup, Alembic migrations, frontend API URL/CORS configuration, and frontend startup from a clean checkout. Commands are documented but the complete clean-start procedure has not been verified.
+**Setup verification limitation:** The manual PostgreSQL installation/database provisioning path and a clean-checkout frontend/backend startup have not yet been independently verified. For the simplest documented reviewer setup, use the Docker Compose quick start above. Do not treat the manual setup instructions as a verified clean-room installation guide.
 
 ## Testing and quality
 
