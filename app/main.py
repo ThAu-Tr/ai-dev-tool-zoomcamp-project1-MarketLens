@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from sqlalchemy.orm import Session
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.db import get_session
 from app.config import cors_allowed_origins
@@ -68,6 +70,19 @@ def create_app(provider_gateway: ProviderGateway | None = None, telemetry: Dashb
                 raise
             record_database_outcome(span)
             return dashboard
+
+    @app.get("/health/ready")
+    def readiness(session: Session = Depends(get_session)) -> Response:
+        """Expose only whether the application can reach its database."""
+        try:
+            session.execute(text("SELECT 1"))
+        except SQLAlchemyError:
+            try:
+                session.rollback()
+            except SQLAlchemyError:
+                pass
+            return Response(status_code=503)
+        return Response(status_code=200)
 
     @app.get("/api/timeline", response_model=TimelineDayResponse)
     def get_timeline(date: Annotated[date, Query(description="Requested market day in YYYY-MM-DD format")], session: Session = Depends(get_session)) -> TimelineDayResponse:

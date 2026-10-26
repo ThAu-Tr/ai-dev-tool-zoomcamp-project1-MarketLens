@@ -292,6 +292,49 @@ Redacted automatic recovery evidence (2026-10-25 UTC; one allowed `restart db`, 
 20:09:46Z  oncall status=resolved_verified
 ```
 
+### Hosted Cloudflare on-call responder (issue #40)
+
+The hosted production responder is a separate Python Worker and SQLite-backed Durable Object under `hosted_oncall/`. It does not replace or change the local receiver, poller, Docker action, or local fault-injection workflow above. It accepts only the `MarketLensProductionDashboardUnavailable` alert with the production labels and exact dashboard URL; Grafana HMAC-SHA256 plus a timestamp (maximum age five minutes) protects the webhook. The Durable Object records each alert and audit transition before acknowledging it. A fingerprint/start-time replay cannot repeat the action, and the restart boundary is saved before the Render API request. State or API uncertainty fails closed.
+
+The agent first checks `GET /api/dashboard`, then the new `GET /health/ready` database probe. If the dashboard recovers or Neon is not ready, it takes no action. It allows 70 seconds for a Render Free cold start, checks both endpoints again, then requires the Render service to be the configured active Web Service with its latest deploy `live`. In-progress deployments, suspended services, 4xx/unknown responses, and unverified Render state escalate without restart. Only a persistent dashboard 5xx with database readiness and Render preflight confirmed can reach the single fixed `POST /v1/services/{RENDER_SERVICE_ID}/restart` operation. Afterward it checks database readiness and the public dashboard for up to 90 seconds; only HTTP 200 with the expected dashboard JSON shape is recorded as recovered. It never reads or acts on Grafana annotations or alert-supplied URLs/commands.
+
+#### Owner deployment steps
+
+1. Confirm issue #39's production rule is active and the existing email notification still fires. Install a current `uv` version (**0.13.4 or later**) and Node.js locally. From the repository root, run:
+
+   ```powershell
+   Set-Location hosted_oncall
+   uv sync
+   uv run pywrangler dev
+   ```
+
+2. In the Render Dashboard, open the deployed MarketLens Web Service and copy its immutable service ID from the service details/URL. Create an API key in Render Account Settings. Render API keys apply to all workspaces the account belongs to; review that scope before creating the key. The code always uses the one configured service ID and the one restart endpoint. Never paste either secret into chat or commit it.
+
+3. In the Cloudflare dashboard, sign in with `uv run pywrangler login`. From `hosted_oncall/`, add the two secrets through the CLI prompts (the values are entered locally and are not part of this repository):
+
+   ```powershell
+   uv run pywrangler secret put GRAFANA_HMAC_SECRET
+   uv run pywrangler secret put RENDER_API_KEY
+   ```
+
+   The Grafana HMAC secret must be at least 32 characters. Deploy with the configured service ID and public dashboard URL as non-secret Worker vars:
+
+   ```powershell
+   uv run pywrangler deploy `
+     --var "RENDER_SERVICE_ID:srv-<service-id>" `
+     --var "MARKETLENS_DASHBOARD_URL:https://marketlens-dtc.onrender.com/api/dashboard"
+   ```
+
+   `wrangler.toml` provisions the `Incidents` Durable Object using SQLite on first deploy. Do not remove its migration or change the Durable Object class name after deployment; that could create new state and weaken replay protection. Cloudflare's current Free limits include 100,000 Worker requests/day; Durable Objects Free also has daily request and compute quotas (100,000 requests and 13,000 GB-s/day). These quotas reset daily and operations can fail when exhausted; Free has no production availability SLA. If the Worker or Durable Object is unavailable, it does not restart Render and Grafana email remains the escalation path ([Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/)).
+
+4. In Grafana Cloud, add an authenticated **Webhook** integration to the existing production email contact point (or a matching webhook notification route while leaving the email route active). Set its URL to `https://<your-worker-domain>/webhook`. Enable HMAC-SHA256 with the same locally held `GRAFANA_HMAC_SECRET`, signature header `X-Grafana-Alerting-Signature`, and timestamp header `X-Grafana-Alerting-Timestamp`. Do not put secrets in the URL. Preserve the rule labels `service=marketlens`, `environment=production`, `source=synthetic`, `severity=critical`, `job=marketlens-production-dashboard`, and `instance=https://marketlens-dtc.onrender.com/api/dashboard`.
+
+5. First use Grafana's contact-point test to verify the endpoint/authentication; a generic test payload is acknowledged but ignored by the strict alert validator. To verify the full safe path without disrupting production, briefly create a test alert with the exact production alert name/labels and a constant firing expression while MarketLens is healthy. Confirm the signed webhook appears in the Worker tail and that the incident is recorded as `no_action` because the dashboard returns 200. Resolve/delete the test rule, confirm the resolved delivery, and confirm the email integration remains active. Do **not** simulate a production outage or use a Render restart in production as a test.
+
+6. Read redacted live diagnostics with `uv run pywrangler tail`. Worker logs contain only status/reason; the Durable Object stores the incident key, transition, safe reason, and timestamp, not payload text, API responses, or credentials. To verify the application readiness endpoint without revealing database details, request `GET https://marketlens-dtc.onrender.com/health/ready`; it returns 200 for `SELECT 1` success and an empty 503 otherwise.
+
+Required Worker configuration names (values are owner-entered): `GRAFANA_HMAC_SECRET`, `RENDER_API_KEY`, `RENDER_SERVICE_ID`, and `MARKETLENS_DASHBOARD_URL`. The two secrets belong in Cloudflare secret settings; the service ID and dashboard URL are non-secret Worker vars. Tests use mocked Grafana requests, SQLite storage, Render responses, and dashboard behavior. Actual Cloudflare deployment, Grafana delivery/authentication, and production restart verification remain owner-side steps and are not evidenced by local tests.
+
 ### Render deployment
 
 The live application is [https://marketlens-dtc.onrender.com/](https://marketlens-dtc.onrender.com/). Its repository settings are:

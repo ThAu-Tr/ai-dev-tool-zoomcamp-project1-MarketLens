@@ -1,0 +1,12 @@
+name = "marketlens-hosted-oncall"
+main = "worker.py"
+compatibility_date = "2026-10-26"
+compatibility_flags = ["python_workers"]
+
+[[durable_objects.bindings]]
+name = "INCIDENTS"
+class_name = "Incidents"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Incidents"]

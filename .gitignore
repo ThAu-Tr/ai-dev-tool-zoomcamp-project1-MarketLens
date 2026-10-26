@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+**/.venv-workers/
+**/python_modules/
+.wrangler/
 .pytest_cache/
 .mypy_cache/
 
