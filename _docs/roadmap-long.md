@@ -1,5 +1,8 @@
 # DTC Final Project Roadmap
 
+> **Status update — 2026-10-26.** M1–M5 completed; M6 production observability and user-impact alerting have documented evidence; M7's **isolated local** on-call recovery flow was demonstrated with independent QA evidence. The **additional hosted Cloudflare responder** remains open under [#40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40), and its live recovery must not be claimed as verified. M8 is in progress: public application owner-confirmed working, latest `main` CI passed ([run](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/actions/runs/40391323719)), and [12-criterion evidence map](submission-evidence.md) committed. Clean-checkout Docker reproduction, actual course submission and three peer reviews remain outstanding. Do not block submission on unaccepted hosted code.
+
+
 ## Goal
 
 Build the final project as one integrated workflow combining the course modules rather than treating each week separately.
@@ -404,12 +407,12 @@ Keep all work within the existing MVP and React → FastAPI → PostgreSQL archi
 
 Criterion 10 awards 1 point for logging and 2 points for key user journeys covered by metrics, traces and structured logs, with telemetry collected, stored and viewable in a UI.
 
-- [ ] Select and document one key journey, such as loading the stored watchlist/dashboard through the frontend, API and database.
-- [ ] Capture journey success/failure and latency metrics, traces, and structured logs correlated by a shared trace ID.
-- [ ] Collect and store the telemetry and demonstrate how to inspect it in a UI.
-- [ ] Exclude customer data and credentials from telemetry; do not record portfolio payloads, article contents, API keys or other secrets.
-- [ ] Demonstrate diagnosis of a controlled failure in an isolated dev/demo environment using the correlated telemetry.
-- [ ] Add deterministic tests for important instrumentation and redaction behavior, using fake external providers and no live market, news or AI calls.
+- [x] Select and document one key journey, such as loading the stored watchlist/dashboard through the frontend, API and database.
+- [x] Capture journey success/failure and latency metrics, traces, and structured logs correlated by a shared trace ID.
+- [x] Collect and store the telemetry and demonstrate how to inspect it in a UI.
+- [x] Exclude customer data and credentials from telemetry; do not record portfolio payloads, article contents, API keys or other secrets.
+- [x] Demonstrate diagnosis of a controlled failure in an isolated dev/demo environment using the correlated telemetry.
+- [x] Add deterministic tests for important instrumentation and redaction behavior, using fake external providers and no live market, news or AI calls.
 
 ### Output
 - Documented journey and telemetry fields, retention/access settings and UI inspection instructions
@@ -424,12 +427,12 @@ Criterion 10 awards 1 point for logging and 2 points for key user journeys cover
 
 Criterion 11 awards 1 point for at least one alert on user impact. These are operational alerts, not price notifications or investment recommendations.
 
-- [ ] Define one actionable alert on the selected journey, with a documented failure/latency threshold, evaluation window and recovery condition.
-- [ ] Configure an actual alert delivery path and record enough redacted context to diagnose the affected journey.
-- [ ] Trigger the alert with a reproducible fault in an isolated dev/demo environment; do not interrupt the public application or consume live provider services.
-- [ ] Remove the fault and verify the user journey and alert return to a healthy state.
-- [ ] Test alert trigger, delivery, recovery and duplicate handling deterministically.
-- [ ] Record the alert rule, delivered alert and recovery evidence; obtain QA verification and human acceptance through the existing process.
+- [x] Define one actionable alert on the selected journey, with a documented failure/latency threshold, evaluation window and recovery condition.
+- [x] Configure an actual alert delivery path and record enough redacted context to diagnose the affected journey.
+- [x] Trigger the alert with a reproducible fault in an isolated dev/demo environment; do not interrupt the public application or consume live provider services.
+- [x] Remove the fault and verify the user journey and alert return to a healthy state.
+- [x] Test alert trigger, delivery, recovery and duplicate handling deterministically.
+- [x] Record the alert rule, delivered alert and recovery evidence; obtain QA verification and human acceptance through the existing process.
 
 ### Output
 - One working user-impact alert and a safe trigger/recovery runbook
@@ -451,15 +454,18 @@ Criterion 12 awards 2 points when an agent wakes on an alert and fixes the issue
 
 Confirm evidence already meets the passing threshold before pursuing this additional score; finalize submission checks in M8. Reuse M6's alert and isolated dev/demo journey; do not add product features or a general-purpose autonomous operations platform.
 
-- [ ] Groom one recoverable operational failure and a specific remediation that restores the selected journey.
-- [ ] Connect the actual alert delivery to an agent wake-up, passing only redacted diagnostic context.
-- [ ] Define the agent's allowed actions, limited credentials, retry/time limits, duplicate handling, audit trail and escalation behavior.
-- [ ] Restrict autonomous remediation to the isolated dev/demo environment; exclude production access, destructive database actions, arbitrary shell execution and unrestricted provider calls.
-- [ ] Implement the bounded remediation and independently verify journey recovery; acknowledge success only after the health/journey check passes.
-- [ ] On unsupported failures, exhausted retries or failed verification, stop and escalate for human intervention.
-- [ ] Add deterministic tests for alert-triggered wake-up, successful remediation, failed recovery, duplicate alerts and permission boundaries, using fake external providers.
-- [ ] Demonstrate the complete chain: controlled fault → user-impact alert → agent wake-up → remediation → verified recovery.
-- [ ] Record redacted evidence and obtain QA verification and human acceptance through the existing process.
+- [x] Groom one recoverable operational failure and a specific remediation that restores the selected journey.
+- [x] Connect the actual alert delivery to an agent wake-up, passing only redacted diagnostic context.
+- [x] Define the agent's allowed actions, limited credentials, retry/time limits, duplicate handling, audit trail and escalation behavior.
+- [x] Restrict autonomous remediation to the isolated dev/demo environment; exclude production access, destructive database actions, arbitrary shell execution and unrestricted provider calls.
+- [x] Implement the bounded remediation and independently verify journey recovery; acknowledge success only after the health/journey check passes.
+- [x] On unsupported failures, exhausted retries or failed verification, stop and escalate for human intervention.
+- [x] Add deterministic tests for alert-triggered wake-up, successful remediation, failed recovery, duplicate alerts and permission boundaries, using fake external providers.
+- [x] Demonstrate the complete chain: controlled fault → user-impact alert → agent wake-up → remediation → verified recovery.
+- [x] Record redacted evidence and obtain QA verification and human acceptance through the existing process.
+
+
+**Scope/evidence note:** These completed checkboxes refer to the *isolated local* Grafana → receiver/feed → host agent → fixed Docker DB restart → dashboard healthy demonstration, with independent QA results recorded on [issue #40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40). The additional Cloudflare/Render hosted responder is **not accepted**: the live webhook reported `state_or_runtime_error`, and the proposed `setAlarm` correction has not achieved independent QA PASS. The hosted extension remains on a separate branch; do not conflate it with accepted local evidence.
 
 ### Output
 - Alert-triggered on-call agent with a documented, bounded remediation and permissions
@@ -551,19 +557,26 @@ Good moments to capture:
 
 ### After Phase 4
 
-- [ ] Document the observed journey, telemetry UI, correlation and data redaction.
-- [ ] Link redacted success/failure diagnosis evidence.
-- [ ] Document the user-impact alert, isolated trigger and verified recovery evidence.
+- [x] Document the observed journey, telemetry UI, correlation and data redaction.
+- [x] Link redacted success/failure diagnosis evidence.
+- [x] Document the user-impact alert, isolated trigger and verified recovery evidence.
+
+See [README observability guide](../README.md#local-dashboard-observability-demo-issue-38) and [production alert guide](../README.md#local-dashboard-availability-alert-issue-39).
 
 ### After Phase 5
 
-- [ ] Document the on-call agent's alert trigger, allowed remediation and permission boundaries if implemented.
-- [ ] Link isolated end-to-end remediation evidence, deterministic test results and verified recovery.
-- [ ] Clearly mark any unimplemented rubric targets and retain QA/human acceptance records.
+- [x] Document the **local** on-call agent's alert trigger, allowed remediation and permission boundaries.
+- [x] Link isolated end-to-end remediation evidence, deterministic test results and verified recovery.
+- [x] Clearly mark the **unverified hosted extension** and retain QA/human acceptance records.
+
+See [local on-call runbook](../README.md#local-on-call-recovery-demo-issue-40), [issue #40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40), and [submission evidence](submission-evidence.md).
 
 ---
 
 # Final Reproducibility Check
+
+**Latest verification snapshot (2026-10-26):** [Rubric evidence map](submission-evidence.md) and [passing GitHub Actions run for `main` commit `e1450a1`](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/actions/runs/40391323719). Owner confirmed the public site loads. Local clean-checkout Compose has not been retested for this revision. Complete submission and peer reviews on the course platform.
+
 
 Before submission, assume someone has never seen the project.
 
@@ -585,28 +598,28 @@ How is it deployed?
 
 Final checklist:
 
-- [ ] README explains the problem.
-- [ ] README explains the MVP.
-- [ ] README explains the architecture.
-- [ ] README lists the technology stack.
-- [ ] README contains local setup instructions.
-- [ ] README contains run instructions.
-- [ ] README contains test instructions.
-- [ ] README contains Docker instructions.
-- [ ] README contains deployment information.
-- [ ] README contains the public application URL.
-- [ ] OpenAPI documentation is accessible.
-- [ ] Architecture documentation is accessible.
-- [ ] AI usage report is accessible.
-- [ ] M6/M7 telemetry, alert and on-call evidence is accessible if implemented; otherwise record the scoring gaps.
+- [x] README explains the problem.
+- [x] README explains the MVP.
+- [x] README explains the architecture.
+- [x] README lists the technology stack.
+- [x] README contains local setup instructions.
+- [x] README contains run instructions.
+- [x] README contains test instructions.
+- [x] README contains Docker instructions.
+- [x] README contains deployment information.
+- [x] README contains the public application URL.
+- [x] OpenAPI documentation is accessible.
+- [x] Architecture documentation is accessible.
+- [x] AI usage report is accessible.
+- [x] M6/M7 telemetry, alert and on-call evidence is accessible if implemented; otherwise record the scoring gaps.
 - [ ] Verify documented setup, migrations and Docker Compose startup from a clean checkout; record the tested revision and prerequisites.
 - [ ] Correct stale documentation, including resolved test-failure warnings and obsolete security-audit/agent-extension rubric claims, while preserving historical milestone records.
-- [ ] Check that documentation describes the submitted MVP without adding unrelated cleanup or features.
-- [ ] Recheck the latest final-project rubric and record its date/version.
-- [ ] Map all 12 current criteria to direct evidence links, expected scores and remaining gaps: problem description; product specification; agent team specification; context management; application; testing; containerization; deployment; CI/CD; observability; alerting on user impact; on-call agent.
-- [ ] Confirm the submitted revision has passing CI and verify the public application and its main journey; link the CI run and deployment evidence.
-- [ ] Describe CI/CD accurately: tests plus current direct automatic Render deployment target 2/3; 3/3 requires automatic dev deployment followed by manual production deployment. A separate dev environment is an additional-score option, not required for passing.
-- [ ] Confirm at least 10/24 points from delivered evidence, without counting unimplemented M6/M7 targets.
+- [x] Check that documentation describes the submitted MVP without adding unrelated cleanup or features.
+- [x] Recheck the latest final-project rubric and record its date/version.
+- [x] Map all 12 current criteria to direct evidence links, expected scores and remaining gaps: problem description; product specification; agent team specification; context management; application; testing; containerization; deployment; CI/CD; observability; alerting on user impact; on-call agent.
+- [x] Confirm the currently selected `main` revision has passing CI and verify the public application's accessibility; link the CI run and deployment evidence. **Recheck after any further commit/merge; detailed main-journey smoke test remains recommended.**
+- [x] Describe CI/CD accurately: tests plus current direct automatic Render deployment target 2/3; 3/3 requires automatic dev deployment followed by manual production deployment. A separate dev environment is an additional-score option, not required for passing.
+- [x] Map documented evidence to a provisional score exceeding 10/24 in [submission-evidence.md](submission-evidence.md). **Actual points depend on reviewer verification; do not treat the provisional estimate as a score.**
 - [ ] Complete three peer reviews as required for a passing submission and record completion in the submission process.
 
 ### Final milestone
@@ -621,6 +634,6 @@ Final checklist:
 - [X] **M3 — Backlog Ready:** Validated MVP translated into executable GitHub Issues.
 - [X] **M4 — Local MVP Complete:** Full-stack MVP locally accepted in #22 with persistence and documented test evidence in #20/#21/#23 (see noted test limitation).
 - [X] **M5 — Public MVP Complete:** Docker Compose, CI, public Render/Neon deployment and rollback were manually accepted (#33–#35); see #36 for milestone evidence.
-- [ ] **M6 — Observability & Alerting Demonstrated:** One MVP journey has correlated telemetry in a UI and a working user-impact alert with verified recovery (criteria 10–11; additional-score targets).
-- [ ] **M7 — On-Call Remediation Demonstrated:** An alert wakes an agent that fixes one bounded operational failure and verifies recovery in isolation (criterion 12; additional-score target).
-- [ ] **M8 — Submission Ready:** Clean-start, CI/deployment checks and a current 12-criterion evidence map support at least 10/24 points; three peer reviews are complete.
+- [x] **M6 — Observability & Alerting Demonstrated:** Correlated telemetry, isolated alert/recovery demonstration and production monitoring documented in README and #38/#39.
+- [x] **M7 — Local On-Call Remediation Demonstrated:** Isolated local recovery QA/evidence in #40 meets the original roadmap scope. **Hosted Cloudflare extension is still blocked and issue #40 stays open.**
+- [ ] **M8 — Submission Ready:** Evidence map and CI are ready; clean-checkout Docker reproduction, actual submission, and three peer reviews remain outstanding.
