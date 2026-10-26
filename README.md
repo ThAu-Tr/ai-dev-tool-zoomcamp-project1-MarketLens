@@ -200,6 +200,19 @@ The example environment file contains only local database and port settings. Mar
 
 ### Local dashboard observability demo (issue #38)
 
+The observability/on-call demo uses a **separate, isolated Docker Compose project** from the normal local application. These are the default local addresses:
+
+| Service | Local address | Purpose |
+| --- | --- | --- |
+| Regular MarketLens app | `http://localhost:8000` | Standard local Compose setup (`compose.yaml`) |
+| Observability demo app | `http://localhost:8001` | Isolated dashboard for alert and recovery testing |
+| Grafana | `http://localhost:3000` | Metrics, traces, logs and local alerts |
+| On-call receiver feed | `http://127.0.0.1:8081` | Loopback-only sanitized events consumed by the host agent |
+| Prometheus | `http://localhost:9090` | Local metrics storage and queries |
+
+The observability app's port and receiver-feed port can be overridden with `MARKETLENS_PORT` and `ONCALL_FEED_PORT` in `.env.observability`. The on-call agent itself runs as a separate host process, not as another public HTTP service. Never fault-inject the normal application or production database.
+
+
 The optional LGTM stack instruments only the stored `GET /api/dashboard` journey. The React request creates a W3C `traceparent`; FastAPI extracts it and creates the server span, then a repository-boundary span covers the PostgreSQL read. Request count, latency, and a structured request log carry the same trace ID. Other routes and the normal Compose/Render deployment remain uninstrumented. The app exports to the local collector over gRPC by default, or directly to a configured OTLP endpoint over HTTP/protobuf.
 
 Telemetry is deliberately limited to service/environment, route template, method, status, duration, outcome, exception class, and trace/span IDs. It does not record headers, query strings, SQL text or parameters, exception messages, request/response bodies, asset or article identifiers, holdings, quantities, or values. The isolated local stack stores telemetry in local Docker volumes with 24-hour retention for traces, logs, and metrics; Grafana uses the local demo login `admin` / `admin`. By default no telemetry is sent outside the local stack. Direct Grafana Cloud export is enabled only when explicitly configured in the deployed service environment.
