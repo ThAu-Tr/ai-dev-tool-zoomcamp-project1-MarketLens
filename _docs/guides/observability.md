@@ -4,7 +4,7 @@ Run commands below from the repository root. The local observability stack is is
 
 ### Local dashboard observability demo (issue #38)
 
-The observability/on-call demo uses a **separate, isolated Docker Compose project** from the normal local application. These are the default local addresses:
+The isolated observability Compose project uses these default addresses:
 
 | Service | Local address | Purpose |
 | --- | --- | --- |
@@ -14,10 +14,10 @@ The observability/on-call demo uses a **separate, isolated Docker Compose projec
 | On-call receiver feed | `http://127.0.0.1:8081` | Loopback-only sanitized events consumed by the host agent |
 | Prometheus | `http://localhost:9090` | Local metrics storage and queries |
 
-The observability app's port and receiver-feed port can be overridden with `MARKETLENS_PORT` and `ONCALL_FEED_PORT` in `.env.observability`. The on-call agent itself runs as a separate host process, not as another public HTTP service. Never fault-inject the normal application or production database.
+Override the demo/receiver ports through `MARKETLENS_PORT`/`ONCALL_FEED_PORT` in `.env.observability`. The on-call agent runs separately on the host. **Never fault-inject the normal application or production database.**
 
 
-The optional LGTM stack instruments only the stored `GET /api/dashboard` journey. The React request creates a W3C `traceparent`; FastAPI extracts it and creates the server span, then a repository-boundary span covers the PostgreSQL read. Request count, latency, and a structured request log carry the same trace ID. Other routes and the normal Compose/Render deployment remain uninstrumented. The app exports to the local collector over gRPC by default, or directly to a configured OTLP endpoint over HTTP/protobuf.
+Only `GET /api/dashboard` is instrumented: React sends W3C `traceparent`, FastAPI records the request and PostgreSQL read spans, and request metrics/logs share the trace ID. Other routes are not instrumented. Local export uses collector gRPC; configured Grafana Cloud export uses OTLP HTTP/protobuf.
 
 Telemetry is deliberately limited to service/environment, route template, method, status, duration, outcome, exception class, and trace/span IDs. It does not record headers, query strings, SQL text or parameters, exception messages, request/response bodies, asset or article identifiers, holdings, quantities, or values. The isolated local stack stores telemetry in local Docker volumes with 24-hour retention for traces, logs, and metrics; Grafana uses the local demo login `admin` / `admin`. By default no telemetry is sent outside the local stack. Direct Grafana Cloud export is enabled only when explicitly configured in the deployed service environment.
 
@@ -34,7 +34,7 @@ docker compose --project-name marketlens-observability --env-file .env.observabi
 curl.exe -i http://localhost:8001/api/dashboard
 ```
 
-The separate project has its own PostgreSQL data volume and starts with the migrated demo user, so the dashboard request returns `200` without provider calls. To load live prices in this local demo, add your own `EODHD_API_KEY` to the ignored `.env.observability` file and use the dashboard's **Refresh data** action. The app service passes optional local provider keys through to the app container; no provider calls happen on startup or dashboard reads. Marketaux and OpenAI keys are optional for their respective features. The on-call receiver does not receive these keys.
+This project uses its own PostgreSQL volume and seeded demo user; the dashboard should return HTTP 200 without provider calls. Provider keys are optional and passed only to the app, not the on-call receiver; add them to `.env.observability` for live refresh features.
 
 To produce a controlled database failure only in this isolated project, run:
 
@@ -44,9 +44,9 @@ curl.exe -i http://localhost:8001/api/dashboard
 docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml start db
 ```
 
-The second request returns `500` while the local database is stopped. Open [Grafana](http://localhost:3000), sign in with the local demo login, and use **Explore**: Prometheus query `marketlens_dashboard_requests_total` shows successes/failures and `marketlens_dashboard_duration_milliseconds_bucket` shows latency; Tempo can open the trace ID; Loki shows `dashboard_request` records. Each signal includes `trace_id`, so paste the same ID into Tempo and compare the matching Loki log and metric sample. The trace shows the `/api/dashboard` span and PostgreSQL read boundary; its status and exception class diagnose failure while the log provides the matching route/outcome, without storing database error text.
+The stopped database produces HTTP 500. In [Grafana Explore](http://localhost:3000/explore) (`admin` / `admin`), inspect Prometheus `marketlens_dashboard_requests_total` and `marketlens_dashboard_duration_milliseconds_bucket`, Tempo spans, and Loki `dashboard_request` logs. Correlate by `trace_id`; the trace includes `dashboard.repository.read` and exception class but no raw database error message.
 
-Observed on the local demo stack: Prometheus contained one `200/success` sample and one `500/failure` sample; Tempo showed both dashboard traces with the `dashboard.repository.read` child span; Loki showed two `dashboard_request` records. The redacted trace IDs matched between all three signals (`961f8f98…` success, `a4c39f9a…` failure). The [local Grafana Explore UI](http://localhost:3000/explore) opens the provisioned data sources and shows the request metric, traces, and correlated logs.
+Recorded evidence: Prometheus reported `200/success` and `500/failure`; Tempo and Loki showed corresponding spans/logs with matching redacted trace IDs (`961f8f98…`, `a4c39f9a…`).
 
 Stop the demo with `docker compose --project-name marketlens-observability --env-file .env.observability -f compose.observability.yaml down`. Add `--volumes` to remove its isolated data and telemetry. The stack is bound to localhost and must not be exposed as a production service.
 
