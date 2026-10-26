@@ -1,6 +1,6 @@
 # DTC Final Project Roadmap
 
-> **Status update — 2026-10-26.** M1–M5 completed; M6 production observability and user-impact alerting have documented evidence; M7's **isolated local** on-call recovery flow was demonstrated with independent QA evidence. The **additional hosted Cloudflare responder** remains open under [#40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40), and its live recovery must not be claimed as verified. M8 is in progress: public application owner-confirmed working, latest `main` CI passed ([run](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/actions/runs/40391323719)), and [12-criterion evidence map](submission-evidence.md) committed. Clean-checkout Docker reproduction, actual course submission and three peer reviews remain outstanding. Do not block submission on unaccepted hosted code.
+> **Status update — 2026-10-26.** M1–M5 completed; M6 production observability and user-impact alerting have documented evidence; M7's **isolated local** on-call recovery flow was demonstrated with independent QA evidence. The **additional hosted Cloudflare responder** remains open under [#40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40), and its live recovery must not be claimed as verified. M8 is in progress: public application owner-confirmed working, latest `main` CI passed ([run](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/actions/runs/40409635009)), and [12-criterion evidence map](submission-evidence.md) committed. The owner reports successful startup of both local Compose environments; fresh clean-checkout reproduction, actual course submission and three peer reviews remain outstanding. Do not block submission on unaccepted hosted code.
 
 
 ## Goal
@@ -399,7 +399,7 @@ Response
 
 This future work targets the [final-project rubric](https://raw.githubusercontent.com/DataTalksClub/ai-dev-tools-zoomcamp/main/project/README.md) checked on **2026-10-25**: 12 criteria, 24 available points, and a passing submission requires **at least 10 points plus three completed peer reviews**. Recheck the current rubric before submission.
 
-M6–M8 below are roadmap targets, not claims of delivered evidence. Existing M1–M5 evidence is expected to exceed the passing score; confirm that assessment in M8 before spending effort on additional points. M6 targets criteria 10–11 (up to 3 points), and M7 targets criterion 12 (up to 2 points). Neither is a prerequisite for passing if the other evidenced criteria already reach 10 points. Security scans and generic agent extension packs are not separate criteria in this rubric.
+The steps below preserve the original roadmap; the completion checkboxes and status updates reflect delivered M6/M7 evidence, while M8 remains open. Existing M1–M5 evidence is expected to exceed the passing score; confirm that assessment in M8 before spending effort on additional points. M6 targets criteria 10–11 (up to 3 points), and M7 targets criterion 12 (up to 2 points). Neither is a prerequisite for passing if the other evidenced criteria already reach 10 points. Security scans and generic agent extension packs are not separate criteria in this rubric.
 
 Keep all work within the existing MVP and React → FastAPI → PostgreSQL architecture. Prefer one existing dashboard journey and small operational changes. Choose tools during grooming; request approval before adding, removing or upgrading dependencies. This roadmap does not authorize production changes.
 
@@ -575,7 +575,7 @@ See [local on-call runbook](guides/oncall-agent.md#local-on-call-recovery-demo-i
 
 # Final Reproducibility Check
 
-**Latest verification snapshot (2026-10-26):** [Rubric evidence map](submission-evidence.md) and [passing GitHub Actions run for `main` commit `e1450a1`](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/actions/runs/40391323719). Owner confirmed the public site loads. Local clean-checkout Compose has not been retested for this revision. Complete submission and peer reviews on the course platform.
+**Latest verification snapshot (2026-10-26):** [Rubric evidence map](submission-evidence.md) and [passing GitHub Actions run for `main` commit `a358393`](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/actions/runs/40409635009). Owner confirmed the public site loads. The owner has started both local Docker Compose environments successfully; a fresh clean-checkout reproduction and full functionality retest have not been performed. Complete submission and peer reviews on the course platform.
 
 
 Before submission, assume someone has never seen the project.
@@ -612,7 +612,7 @@ Final checklist:
 - [x] Architecture documentation is accessible.
 - [x] AI usage report is accessible.
 - [x] M6/M7 telemetry, alert and on-call evidence is accessible if implemented; otherwise record the scoring gaps.
-- [ ] Verify documented setup, migrations and Docker Compose startup from a clean checkout; record the tested revision and prerequisites.
+- [ ] Verify documented setup, migrations and Docker Compose startup **from a clean checkout**; record the tested revision and prerequisites. Owner has verified startup of both existing local Compose environments, but not a fresh checkout.
 - [ ] Correct stale documentation, including resolved test-failure warnings and obsolete security-audit/agent-extension rubric claims, while preserving historical milestone records.
 - [x] Check that documentation describes the submitted MVP without adding unrelated cleanup or features.
 - [x] Recheck the latest final-project rubric and record its date/version.
