@@ -39,15 +39,15 @@ Everyday investors often need to piece together price movements, company news, i
 
 MarketLens brings those inputs into a combined dashboard and a persistent historical price timeline. It is a monitoring and context tool—not a trading system, portfolio optimiser, or source of investment recommendations.
 
-### AI context (issue #13)
-
-MarketLens optionally generates qualified, source-linked AI context using stored market movements and news after a manual refresh. The feature is bounded by rate limits and evidence constraints; missing credentials or AI failures do not prevent prices and news from refreshing. See [AI context implementation and validation](_docs/ai-context.md) for configuration, safeguards, and testing.
-
 ## What exists today
 
 The locally accepted MVP includes a persisted dashboard; a bounded, curated stock/ETF/index catalogue; Owned and Interested watchlists with purchase lots; followed industries; manual refresh of prices through EODHD and categorized news through Marketaux; qualified, source-linked AI context; and a historical price timeline.
 
 The asset picker searches a local catalogue rather than the provider's entire supported universe. Provider-wide discovery is deferred to [#32](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/32). News per followed industry and automatic redisplay of stored news after refollowing are deferred to [#30](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/30) and [#31](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/31). Human acceptance and the history of corrected defects are recorded in [#22](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/22).
+
+### AI context (issue #13)
+
+MarketLens optionally generates qualified, source-linked AI context using stored market movements and news after a manual refresh. The feature is bounded by rate limits and evidence constraints; missing credentials or AI failures do not prevent prices and news from refreshing. See [AI context implementation and validation](_docs/ai-context.md) for configuration, safeguards, and testing.
 
 ## Demo
 
@@ -142,34 +142,9 @@ The integration suite uses an isolated in-memory SQLite database and determinist
 
 ## Local development and configuration
 
-**Course assignment / peer review:** MarketLens is a non-commercial educational project. Reviewers who run the app locally create their own EODHD and Marketaux accounts and supply their own API keys in a local `.env` file (copy variable names from `.env.example`). API keys are never included in the repository, and the frontend must not expose them. Provider usage is subject to each reviewer's own account limits and terms.
+For the recommended reviewer setup, use [Docker Compose](#quick-start-with-docker-compose). For manual development, copy `.env.example` to the ignored `.env`, provide a PostgreSQL `DATABASE_URL`, run `uv run alembic upgrade head`, and start FastAPI with `uv run uvicorn app.main:app --reload`. In another terminal, run `npm ci --prefix frontend` and `npm --prefix frontend run dev`. The frontend reads `VITE_API_BASE_URL` (set it to `http://127.0.0.1:8000` when needed); set `CORS_ALLOWED_ORIGINS` for the development frontend origin. Never expose provider API keys in the frontend.
 
-
-The backend reads `DATABASE_URL`, `EODHD_API_KEY`, and optional `MARKETAUX_API_KEY` from the process environment. For local use, copy `.env.example` to the ignored `.env` file and add your own keys there; a local `.env` is loaded without overriding variables supplied by the deployment environment. `MARKETAUX_USER_AGENT` can override the request User-Agent. Alembic reads `DATABASE_URL` when applying migrations.
-
-```powershell
-$env:DATABASE_URL = "postgresql+psycopg://USER:PASSWORD@HOST:5432/DATABASE"
-uv run alembic upgrade head
-uv run uvicorn app.main:app --reload
-```
-
-To manually smoke-check Marketaux after provider composition is enabled, configure `MARKETAUX_API_KEY` in the backend environment and run one dashboard refresh with one or more tracked symbols. Confirm the refresh completes, then inspect `GET /api/dashboard` for metadata-only articles and source links. The adapter makes separate bounded queries for tracked symbols and followed industries (at most two requests, with three results per request); this live check is optional and must use your own account and quota. Automated tests mock HTTP and do not call Marketaux.
-
-### EODHD smoke check (manual, uses your account)
-
-After migrations, start the backend with `EODHD_API_KEY` set and request `POST /api/refresh` once. Confirm the response succeeds and `GET /api/dashboard` shows an `asOf` timestamp and currency supplied by the provider. Then request `GET /api/timeline?date=YYYY-MM-DD` for one eligible date with known EODHD coverage and confirm its `source` is `newly-loaded`; request the same date again and confirm `source` is `archive`. The second request should not call EODHD. Each refresh may try the intraday endpoint and then fall back to daily closes; use one tracked asset and avoid repeated retries to stay within the free account's daily request limit. Adapter tests mock HTTP and never consume API calls.
-
-The frontend uses `VITE_API_BASE_URL` to select the backend URL. To run the React development server in a separate PowerShell terminal, use:
-
-```powershell
-npm --prefix frontend install
-$env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
-npm --prefix frontend run dev
-```
-
-The FastAPI backend permits configured frontend origins through `CORS_ALLOWED_ORIGINS` (default `http://localhost:5173`; see `.env.example`). If using another frontend origin, explicitly configure it. Keep EODHD, Marketaux, and OpenAI keys on the backend only. Apply `uv run alembic upgrade head` after updating the application code and before starting the backend.
-
-**Setup verification limitation:** The manual PostgreSQL installation/database provisioning path and a clean-checkout frontend/backend startup have not yet been independently verified. For the simplest documented reviewer setup, use the Docker Compose quick start above. Do not treat the manual setup instructions as a verified clean-room installation guide.
+The manual PostgreSQL provisioning and clean-checkout development startup have not been independently verified. The Docker quick start is the recommended approach.
 
 ## Testing and quality
 
@@ -207,6 +182,10 @@ Open [http://localhost:8000](http://localhost:8000). Compose waits for PostgreSQ
 
 The default setup uses **both** gitignored environment files: `.env` (optional `EODHD_API_KEY`, `MARKETAUX_API_KEY` and `OPENAI_API_KEY` for market/news/AI refresh) and `.env.compose` (local PostgreSQL credentials and `MARKETLENS_PORT`). The command lists `.env` first and `.env.compose` last so Compose-specific database and port settings take precedence. `DATABASE_URL` may be blank in `.env`: `compose.yaml` explicitly creates the container's database URL using the PostgreSQL `db` service, so it does not use the host/Neon URL from `.env`. With blank provider keys, the app starts but provider-dependent refreshes cannot complete. Do not commit secrets; no provider credentials are bundled in the image or repository. `MARKETLENS_PORT` changes the host port (the app remains on container port 8000).
 
+## Observability and operations
+
+Operational monitoring and recovery are documented in separate runbooks; the following summaries describe how to find them.
+
 ### Local dashboard observability demo (issue #38)
 
 The separate `compose.observability.yaml` stack runs an isolated application at `http://localhost:8001` and Grafana at `http://localhost:3000`. Copy `.env.observability.example` to `.env.observability` on first setup; replace its example database password. Provider API keys are optional for the monitoring/on-call demo (add them only for live refresh features). The regular Docker application remains on port `8000`. The receiver feed is loopback-only on `127.0.0.1:8081`, and Prometheus uses `9090`.
@@ -231,34 +210,10 @@ An alert from the isolated Grafana stack can wake a locally running host agent t
 
 **Agent startup, allowed actions, recovery test, and limitations:** [On-call agent runbook](_docs/oncall-agent.md#local-on-call-recovery-demo-issue-40).
 
-### Render deployment
-
-The live application is [https://marketlens-dtc.onrender.com/](https://marketlens-dtc.onrender.com/). Its repository settings are:
-
-- **Service type:** Web Service
-- **Runtime:** Docker
-- **Branch:** `main`
-- **Auto-deploy:** After CI checks pass
-- **Root directory:** repository root (leave blank)
-- **Dockerfile path:** `./Dockerfile`
-- **Docker build context:** repository root (`.`)
-- **Port:** use Render's injected `PORT`; the image defaults to `8000` for local runs. Do not set `PORT` manually in Render.
-
-The Docker startup command runs `alembic upgrade head` before starting Uvicorn. For deployment, provide a Neon PostgreSQL connection string in the required `DATABASE_URL` environment variable and retain its `sslmode=require` option. The app accepts Neon `postgres://` and `postgresql://` URL schemes and adapts them to the installed `psycopg` driver.
-
-Configure these environment variables in the Render service:
-
-- **Required:** `DATABASE_URL`
-- **Optional provider features:** `EODHD_API_KEY` (market prices), `MARKETAUX_API_KEY` (news), and `OPENAI_API_KEY` (AI context). `MARKETAUX_USER_AGENT` and `OPENAI_MODEL` can override their application defaults.
-- **Separate frontend only:** `CORS_ALLOWED_ORIGINS`, set to the exact frontend origin if it is hosted on a different origin. The current app serves its frontend and API from the same service.
-
-The project owner reports manually verifying deployment through CI/CD, saved watchlist data across a restart, and a Render dashboard rollback. This documentation update did not independently exercise the live service. To check it, open the URL above, confirm the page title is “MarketLens | Market context,” add a watchlist asset, then revisit it after a service restart. GitHub Actions checks backend tests, frontend tests, and the production frontend build on pull requests and pushes to `main`.
-
-To roll back, open the service's **Deploys** page in the [Render Dashboard](https://dashboard.render.com/), choose a previous successful deploy, and select **Rollback**. A dashboard rollback disables automatic deploys; re-enable them from the service **Settings** page when ready. A code rollback does not roll back Neon schema migrations or database data, so confirm the selected application version is compatible with the current database schema. See [Render's rollback guide](https://render.com/docs/rollbacks).
-
-For local Compose persistence checks, add an asset to the watchlist and, if marking it Owned, save purchase lots. Stop and restart with the Compose commands above, then confirm the asset and lots remain. `docker compose --env-file .env.compose logs app` shows startup and migration output. This local setup does not publish the app to the internet.
-
 ## Deployment and CI/CD
 
 GitHub Actions runs the backend unit and integration suite, frontend tests, and production build on pull requests and pushes to `main`. Locally, run `uv sync && uv run pytest` for the backend and integration tests, then `npm ci --prefix frontend && npm --prefix frontend run test && npm --prefix frontend run build` for the frontend checks. These automated checks use local test data and do not require provider API keys.
 
+### Render deployment
+
+MarketLens is deployed on [Render](https://marketlens-dtc.onrender.com/) from `main` with Docker and Neon PostgreSQL. For required environment variables, production configuration, rollback, and persistence validation, see the [deployment runbook](_docs/deployment.md#render-deployment).
