@@ -38,28 +38,26 @@ class HostedOnCallPolicy:
         if dashboard is not False:
             return PolicyResult("dashboard_failure_not_server_error")
 
-        readiness = await self.adapter.database_ready()
-        if readiness == 503:
-            return PolicyResult("database_unavailable")
-        if readiness != 200:
-            return PolicyResult("readiness_unknown")
+        # Readiness can fail while a sleeping Render Free instance is waking.
+        # Record an initial observation, but classify it only after the grace
+        # period; an initial 503/unknown must never trigger a blind restart.
+        await self.adapter.database_ready()
 
         # A public request wakes a Render Free service. Allow its documented
         # cold-start window before considering the one restart action.
         await self.adapter.wait(self.COLD_START_GRACE_SECONDS)
         dashboard = await self.adapter.dashboard_healthy()
+        readiness = await self.adapter.database_ready()
+        if readiness == 503:
+            return PolicyResult("database_unavailable")
+        if readiness != 200:
+            return PolicyResult("readiness_unknown")
         if dashboard is True:
             return PolicyResult("cold_start_recovered")
         if dashboard is None:
             return PolicyResult("dashboard_probe_unknown")
         if dashboard is not False:
             return PolicyResult("dashboard_failure_not_server_error")
-
-        readiness = await self.adapter.database_ready()
-        if readiness == 503:
-            return PolicyResult("database_unavailable")
-        if readiness != 200:
-            return PolicyResult("readiness_unknown")
 
         render_state = await self.adapter.render_preflight()
         if render_state != "ready":

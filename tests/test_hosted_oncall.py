@@ -183,6 +183,33 @@ def test_preflight_no_action_for_healthy_database_cold_start_or_unknown(
     assert adapter.restart_calls == 0
 
 
+@pytest.mark.parametrize("initial_readiness", [503, None])
+def test_temporary_readiness_failure_recovers_during_cold_start_grace(initial_readiness) -> None:
+    adapter = FakeAdapter(
+        dashboard=[False, True], readiness=[initial_readiness, 200], render="ready"
+    )
+
+    outcome = run(HostedOnCallPolicy(adapter).run(lambda: pytest.fail("must not restart")))
+
+    assert outcome == "cold_start_recovered"
+    assert adapter.waits == [70]
+    assert adapter.restart_calls == 0
+
+
+@pytest.mark.parametrize(("readiness", "expected"), [
+    ([200, 503], "database_unavailable"),
+    ([None, None], "readiness_unknown"),
+])
+def test_persistent_post_grace_readiness_failure_never_restarts(readiness, expected) -> None:
+    adapter = FakeAdapter(dashboard=[False, False], readiness=readiness, render="ready")
+
+    outcome = run(HostedOnCallPolicy(adapter).run(lambda: pytest.fail("must not restart")))
+
+    assert outcome == expected
+    assert adapter.waits == [70]
+    assert adapter.restart_calls == 0
+
+
 def test_recoverable_failure_persists_attempt_then_restarts_once_and_verifies() -> None:
     adapter = FakeAdapter(dashboard=[False, False, True], readiness=[200, 200, 200])
     transitions: list[str] = []
