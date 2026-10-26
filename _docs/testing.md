@@ -1,6 +1,29 @@
-# Manual provider smoke tests
+# Testing and verification
 
-These optional tests use your own EODHD or Marketaux account and API quota. Automated tests use mocks.
+This document covers automated checks and optional live provider smoke tests. Live checks use your own EODHD or Marketaux account and API quota; automated tests use fakes/mocks.
+
+## Automated checks and test coverage
+
+Backend tests:
+
+```powershell
+uv sync
+uv run pytest  # Runs backend unit and integration tests
+uv run pytest tests/integration
+```
+
+Frontend tests and production build:
+
+```powershell
+npm --prefix frontend run test
+npm --prefix frontend run build
+```
+
+`tests/integration/` is the separately runnable HTTP-to-database workflow suite. It covers adding and managing an asset before reading the dashboard, refreshing and persisting prices/news/AI context before reading the dashboard, and loading then revisiting a historical day. Run it with `uv run pytest tests/integration`; the full backend suite also includes it.
+
+The existing `tests/test_asset_creation.py`, `test_asset_ownership.py`, `test_purchase_lots.py`, `test_refresh.py`, `test_direct_news.py`, `test_ai_context.py`, and `test_timeline.py` contain additional API/service persistence and failure cases. Industry, dashboard, and asset-removal tests likewise exercise HTTP routes against isolated SQLite. `test_asset_catalogue.py` exercises catalogue search through HTTP and tests its service directly; it does not access a database. `test_eodhd_provider.py`, `test_marketaux.py`, and `test_provider_factory.py` focus on provider adapters and composition; they use fakes and do not establish live provider connectivity. Some service and repository logic is tested directly in `test_ai_context.py` and provider-specific tests.
+
+The integration suite uses an isolated in-memory SQLite database and deterministic fake providers, so it makes no live market, news, or AI calls. SQLite test results do not establish PostgreSQL compatibility or real provider integration. Those require the separate manual PostgreSQL/provider smoke checks described below.
 
 ## Marketaux smoke check
 
