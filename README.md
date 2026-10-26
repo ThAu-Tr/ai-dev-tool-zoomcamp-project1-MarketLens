@@ -31,7 +31,7 @@ Copy-Item .env.compose.example .env.compose
 docker compose --env-file .env --env-file .env.compose up --build
 ```
 
-Open **http://localhost:8000**. Compose starts the application and PostgreSQL and applies Alembic migrations on startup. Market-data, news and AI refreshes require your own optional API keys; the application itself can start without them. The latter file takes precedence for overlapping Compose settings. `DATABASE_URL` in `.env` is ignored by the Docker app because `compose.yaml` explicitly constructs its PostgreSQL connection URL using the `db` service. Keep `CORS_ALLOWED_ORIGINS=http://localhost:8000` in `.env.compose` to override the frontend development origin from `.env`. Stop with `Ctrl+C` and `docker compose --env-file .env --env-file .env.compose down` (keeps the database volume). See [Run with Docker Compose](#run-with-docker-compose) for persistence, options and troubleshooting context.
+Open **http://localhost:8000**. Compose starts the application and PostgreSQL and applies Alembic migrations on startup. Market-data, news and AI refreshes require your own optional API keys; the application itself can start without them. The latter file takes precedence for overlapping Compose settings. `DATABASE_URL` in `.env` is ignored by the Docker app because `compose.yaml` explicitly constructs its PostgreSQL connection URL using the `db` service. Stop with `Ctrl+C` and `docker compose --env-file .env --env-file .env.compose down` (keeps the database volume). See [Run with Docker Compose](#run-with-docker-compose) for persistence, options and troubleshooting context.
 
 ## The problem
 
@@ -196,13 +196,12 @@ Copy-Item .env.example .env
 Copy-Item .env.compose.example .env.compose
 # Put your EODHD, Marketaux and OpenAI keys in .env if you want refresh features.
 # Edit .env.compose and replace the example local database password.
-# Keep CORS_ALLOWED_ORIGINS=http://localhost:8000 in .env.compose.
 docker compose --env-file .env --env-file .env.compose up --build
 ```
 
 Open [http://localhost:8000](http://localhost:8000). Compose waits for PostgreSQL readiness, and the app applies Alembic migrations before starting. The `postgres_data` volume keeps the watchlist, purchase lots, and other stored data across app restarts. Stop with `Ctrl+C`, then run `docker compose --env-file .env --env-file .env.compose down`; this preserves the database volume. To remove the stored database as well, run `docker compose --env-file .env --env-file .env.compose down --volumes`.
 
-The default setup uses **both** gitignored environment files: `.env` (optional `EODHD_API_KEY`, `MARKETAUX_API_KEY` and `OPENAI_API_KEY` for market/news/AI refresh) and `.env.compose` (local PostgreSQL credentials and `MARKETLENS_PORT`). The command lists `.env` first and `.env.compose` last so Compose-specific database, port and CORS settings take precedence. `DATABASE_URL` may be blank in `.env`: `compose.yaml` explicitly creates the container's database URL using the PostgreSQL `db` service, so it does not use the host/Neon URL from `.env`. If your `.env.compose` predates this documentation, add `CORS_ALLOWED_ORIGINS=http://localhost:8000` so the development-origin value in `.env` does not override it. With blank provider keys, the app starts but provider-dependent refreshes cannot complete. Do not commit secrets; no provider credentials are bundled in the image or repository. `MARKETLENS_PORT` changes the host port (the app remains on container port 8000).
+The default setup uses **both** gitignored environment files: `.env` (optional `EODHD_API_KEY`, `MARKETAUX_API_KEY` and `OPENAI_API_KEY` for market/news/AI refresh) and `.env.compose` (local PostgreSQL credentials and `MARKETLENS_PORT`). The command lists `.env` first and `.env.compose` last so Compose-specific database and port settings take precedence. `DATABASE_URL` may be blank in `.env`: `compose.yaml` explicitly creates the container's database URL using the PostgreSQL `db` service, so it does not use the host/Neon URL from `.env`. With blank provider keys, the app starts but provider-dependent refreshes cannot complete. Do not commit secrets; no provider credentials are bundled in the image or repository. `MARKETLENS_PORT` changes the host port (the app remains on container port 8000).
 
 ### Local dashboard observability demo (issue #38)
 
