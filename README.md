@@ -2,15 +2,15 @@
 
 **MarketLens** is a lightweight investment-monitoring dashboard for everyday investors. It brings together tracked stocks, ETFs and indices, price history, relevant news, and qualified AI-generated market context. It is an educational monitoring tool, **not** a trading platform or source of investment advice.
 
-**[Open the live application](https://marketlens-dtc.onrender.com/)** · **[Project issues](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues)** · **[Development workflow](_docs/process.md)** · **[AI-assisted development evidence](_docs/ai-usage-report.md)**
+**[Public demo URL (currently suspended)](https://marketlens-dtc.onrender.com/)** · **[Project issues](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues)** · **[Development workflow](_docs/process.md)** · **[AI-assisted development evidence](_docs/ai-usage-report.md)**
 
-> **Project status (October 2026):** The locally accepted MVP is deployed publicly on Render. Production dashboard observability and Grafana Cloud monitoring are documented below. The local on-call demonstration has independent QA evidence; the separate hosted Cloudflare responder is still undergoing deployment/acceptance debugging under [issue #40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40). Do not treat hosted recovery as verified.
+> **Hosting status (2026-11-05):** Render notified the owner that the workspace exhausted its 5 GB monthly outbound-bandwidth allowance and suspended its Free services. The public MarketLens demo is **currently unavailable due to hosting limits**, not a verified application failure. It may resume after the monthly allowance resets or the billing/plan situation is resolved. The locally accepted MVP was previously deployed publicly on Render. Production dashboard observability and Grafana Cloud monitoring are documented below. The local on-call demonstration has independent QA evidence; the separate hosted Cloudflare responder is still undergoing deployment/acceptance debugging under [issue #40](https://github.com/ThAu-Tr/ai-dev-tool-zoomcamp-project1-MarketLens/issues/40). Do not treat hosted recovery as verified.
 
 ## Reviewer quick links
 
 | What to review | Where |
 | --- | --- |
-| Live demo | [MarketLens on Render](https://marketlens-dtc.onrender.com/) |
+| Public demo | [MarketLens on Render](https://marketlens-dtc.onrender.com/) — **currently suspended by Render (bandwidth allowance exceeded; reported 2026-11-05)** |
 | Local startup | [Quick start with Docker Compose](#quick-start-with-docker-compose) |
 | Tests and CI/CD | [Running checks](#running-checks) · [GitHub Actions](.github/workflows) |
 | Architecture and API | [Architecture](#architecture) · [OpenAPI contract](openapi.yaml) |
@@ -51,7 +51,7 @@ MarketLens optionally generates qualified, source-linked AI context using stored
 
 ## Demo
 
-Try the [live MarketLens application](https://marketlens-dtc.onrender.com/). On Render Free, the first request after inactivity may take longer while the service wakes up. A screenshot or video walkthrough has not yet been added; the public app is the primary demo.
+The [public MarketLens demo URL](https://marketlens-dtc.onrender.com/) is **currently unavailable**: the owner received a Render suspension email on 2026-11-05 after the workspace reached its 5 GB monthly outbound-bandwidth allowance. This is different from a normal Free-service cold start (which can take about one minute). Until Render restores service, use the [local Docker Compose quick start](#quick-start-with-docker-compose) to try the application. A screenshot or video walkthrough has not yet been added.
 
 ## MVP scope
 
@@ -169,7 +169,7 @@ GitHub Actions runs the backend unit and integration suite, frontend tests, and 
 
 ### Render deployment
 
-MarketLens is deployed on [Render](https://marketlens-dtc.onrender.com/) from `main` with Docker and Neon PostgreSQL. For required environment variables, production configuration, rollback, and persistence validation, see the [deployment runbook](_docs/guides/deployment.md#render-deployment).
+MarketLens was deployed on [Render](https://marketlens-dtc.onrender.com/) from `main` with Docker and Neon PostgreSQL; **the public service is currently suspended due to the workspace's monthly outbound-bandwidth limit** (owner-reported 2026-11-05). The Hobby plan includes 5 GB/month shared across the workspace. Without a payment method, Render can suspend Free services for the rest of the month after this is exhausted. Hosting suspension is not a recoverable application error: a Render service restart/on-call action will not bypass it. See the [deployment runbook](_docs/guides/deployment.md#render-deployment) and [Render bandwidth documentation](https://render.com/docs/outbound-bandwidth).
 
 ## Observability and operations
 
