@@ -4,7 +4,7 @@ Detailed deployment notes for MarketLens. For the quickest local installation, s
 
 ## Render deployment
 
-The live application is [https://marketlens-dtc.onrender.com/](https://marketlens-dtc.onrender.com/). Its repository settings are:
+The public application URL is [https://marketlens-dtc.onrender.com/](https://marketlens-dtc.onrender.com/), **currently unavailable due to a Render Free-service suspension reported by the owner on 2026-11-05**. Its repository settings are:
 
 - **Service type:** Web Service
 - **Runtime:** Docker
@@ -23,7 +23,9 @@ Configure these environment variables in the Render service:
 - **Optional provider features:** `EODHD_API_KEY` (market prices), `MARKETAUX_API_KEY` (news), and `OPENAI_API_KEY` (AI context). `MARKETAUX_USER_AGENT` and `OPENAI_MODEL` can override their application defaults.
 - **Separate frontend only:** `CORS_ALLOWED_ORIGINS`, set to the exact frontend origin if it is hosted on a different origin. The current app serves its frontend and API from the same service.
 
-The owner reports verifying CI/CD deployment, saved watchlist data after a restart, and a Render dashboard rollback; these were not independently repeated for this documentation update. To smoke-check, open the live URL, add a watchlist asset, and verify it persists after a service restart.
+**Free hosting / bandwidth limitation:** Render's Hobby workspace plan includes **5 GB of outbound bandwidth each month**, shared across workspace services. The owner received an email saying this allowance was exhausted and Free services were suspended (2026-11-05). Without a payment method, Render can suspend Free services for the remainder of the month; adding billing or moving to a suitable paid service can change the outcome and may incur charges. Check **Render Dashboard → Billing → Monthly Included Usage**, and the service **Metrics → Outbound Bandwidth** graph. A suspension is not a normal ~one-minute idle cold start and cannot be corrected by restarting the app or the hosted on-call agent. See [Render's bandwidth policy](https://render.com/docs/outbound-bandwidth) and [Free-service limitations](https://render.com/docs/free). For an offline review, use the [local Docker Compose instructions](../../README.md#quick-start-with-docker-compose).
+
+The owner reports verifying CI/CD deployment, saved watchlist data after a restart, and a Render dashboard rollback; these were not independently repeated for this documentation update. Once the service is restored, smoke-check the public URL, add a watchlist asset, and verify it persists after a service restart.
 
 To roll back, open the service's **Deploys** page in the [Render Dashboard](https://dashboard.render.com/), choose a previous successful deploy, and select **Rollback**. A dashboard rollback disables automatic deploys; re-enable them from the service **Settings** page when ready. A code rollback does not roll back Neon schema migrations or database data, so confirm the selected application version is compatible with the current database schema. See [Render's rollback guide](https://render.com/docs/rollbacks).
 
